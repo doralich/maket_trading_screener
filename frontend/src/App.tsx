@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import useWebSocket from 'react-use-websocket'
-
-interface MarketUpdate {
-  ticker: string;
-  price?: number;
-  change?: number;
-  [key: string]: any;
-}
+import CryptoTable, { MarketUpdate } from './components/CryptoTable'
 
 interface WSMessage {
   type: string;
@@ -83,62 +77,33 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-grow flex flex-col space-y-4">
-        {/* Top Section: Statistics or Filters */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b-2 border-terminal-green pb-4">
+        {/* Top Section: Statistics */}
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b-2 border-terminal-green pb-4">
           <div className="border border-terminal-green p-2 bg-terminal-header">
-            <h2 className="text-sm font-bold border-b border-terminal-green mb-2">/ MARKET_SUMMARY</h2>
-            <div className="text-xs space-y-1">
-              <div>ASSETS_TRACKED: {marketData.length}</div>
-              <div>VOL_24H: --</div>
-              <div>DOMINANCE: --</div>
+            <h2 className="text-[10px] font-bold border-b border-terminal-green/30 mb-2 opacity-70">/ ASSETS_TRACKED</h2>
+            <div className="text-xl font-bold terminal-glow">{marketData.length}</div>
+          </div>
+          <div className="border border-terminal-green p-2 bg-terminal-header">
+            <h2 className="text-[10px] font-bold border-b border-terminal-green/30 mb-2 opacity-70">/ TOP_GAINER</h2>
+            <div className="text-sm font-bold text-terminal-green">
+              {marketData.length > 0 ? [...marketData].sort((a,b) => (b.change||0) - (a.change||0))[0].ticker : '--'}
             </div>
           </div>
-          <div className="border border-terminal-green p-2 bg-terminal-header col-span-2">
-            <h2 className="text-sm font-bold border-b border-terminal-green mb-2">/ SEARCH_AND_FILTER</h2>
-            <div className="flex space-x-2">
-              <input 
-                type="text" 
-                placeholder="ENTER_TICKER..." 
-                className="bg-black border border-terminal-green text-terminal-green px-2 py-1 text-xs w-full focus:outline-none focus:terminal-glow placeholder:opacity-30"
-              />
-              <button className="bg-terminal-green text-black px-4 py-1 text-xs font-bold hover:bg-white transition-colors">
-                EXECUTE
-              </button>
+          <div className="border border-terminal-green p-2 bg-terminal-header">
+            <h2 className="text-[10px] font-bold border-b border-terminal-green/30 mb-2 opacity-70">/ TOP_LOSER</h2>
+            <div className="text-sm font-bold text-red-500">
+              {marketData.length > 0 ? [...marketData].sort((a,b) => (a.change||0) - (b.change||0))[0].ticker : '--'}
             </div>
+          </div>
+          <div className="border border-terminal-green p-2 bg-terminal-header">
+            <h2 className="text-[10px] font-bold border-b border-terminal-green/30 mb-2 opacity-70">/ SYSTEM_LOAD</h2>
+            <div className="text-sm font-bold opacity-50">STABLE</div>
           </div>
         </section>
 
         {/* Data Table Area */}
-        <section className="flex-grow border border-terminal-green bg-black p-2 overflow-auto relative min-h-[400px]">
-          <h2 className="text-sm font-bold border-b border-terminal-green mb-2">/ CRYPTO_TOP_MOVERS</h2>
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-terminal-green opacity-70">
-                <th className="p-2">TICKER</th>
-                <th className="p-2 text-right">PRICE</th>
-                <th className="p-2 text-right">CHANGE_24H</th>
-                <th className="p-2 text-right">VOLUME</th>
-              </tr>
-            </thead>
-            <tbody>
-              {marketData.length > 0 ? marketData.map((asset, i) => (
-                <tr key={asset.ticker || i} className="hover:bg-terminal-green hover:text-black cursor-pointer group">
-                  <td className="p-2 font-bold">{asset.ticker}</td>
-                  <td className="p-2 text-right">{(asset.price || asset.last || 0).toLocaleString()}</td>
-                  <td className={`p-2 text-right ${(asset.change || 0) >= 0 ? 'text-terminal-green group-hover:text-black' : 'text-red-500 group-hover:text-black'}`}>
-                    {(asset.change || 0) > 0 ? '+' : ''}{asset.change}%
-                  </td>
-                  <td className="p-2 text-right">{asset.volume || asset['volume (24h)'] || '--'}</td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={4} className="p-4 text-center opacity-50 animate-pulse">
-                    WAITING_FOR_DATA_STREAM...
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <section className="flex-grow min-h-[400px]">
+          <CryptoTable data={marketData} />
         </section>
       </main>
 
