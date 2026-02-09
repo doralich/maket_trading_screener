@@ -4,9 +4,9 @@
 - [x] Task: Project Scaffolding (4215321)
     - [x] Initialize FastAPI project structure (4215321)
     - [x] Configure `pip` virtual environment and install dependencies (4215321) (`fastapi`, `uvicorn`, `tvscreener`, `pandas`)
-- [ ] Task: tvscreener Integration
-    - [ ] Implement a service to fetch top-moving crypto assets using `tvscreener`
-    - [ ] Create an endpoint for ticker search and data retrieval
+- [x] Task: tvscreener Integration (7023cb4)
+    - [x] Implement a service to fetch top-moving crypto assets (7023cb4) using `tvscreener`
+    - [x] Create an endpoint for ticker search and data retrieval (7023cb4)
 - [ ] Task: WebSocket Server Implementation
     - [ ] Implement a WebSocket endpoint in FastAPI to broadcast market updates
     - [ ] Add basic periodic polling logic to push updates to connected clients
