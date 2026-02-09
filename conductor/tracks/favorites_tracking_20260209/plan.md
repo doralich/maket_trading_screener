@@ -1,6 +1,6 @@
 # Implementation Plan: Favorite Tickers & Multi-Timeframe Data Persistence
 
-## Phase 1: Database Schema & Favorites Management
+## Phase 1: Database Schema & Favorites Management [checkpoint: 5fe0c2c]
 - [x] Task: Database Migration & Models (c7c2327)
     - [x] Create SQLite schema for `ticker_index`, `favorites`, and `market_data_history` (c7c2327)
     - [x] Implement SQLAlchemy/SQLModel entities for these tables (c7c2327)
@@ -8,7 +8,7 @@
     - [x] Write unit tests for adding/removing/listing favorites (c0afaf1)
     - [x] Implement `POST /api/v1/favorites` and `DELETE /api/v1/favorites/{symbol}` (c0afaf1)
     - [x] Implement `GET /api/v1/favorites` (c0afaf1)
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Database Schema & Favorites Management' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Database Schema & Favorites Management' (5fe0c2c)
 
 ## Phase 2: Background Workers & Data Sync
 - [ ] Task: Ticker Indexing Service
