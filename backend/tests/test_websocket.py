@@ -17,10 +17,12 @@ def test_websocket_broadcast():
     with client.websocket_connect("/ws") as websocket:
         # Ignore welcome message
         websocket.receive_json()
+        # Ignore initial update
+        websocket.receive_json()
         
         # Manually trigger broadcast via manager for testing
-        asyncio.run(manager.broadcast({"type": "update", "data": "test_data"}))
+        asyncio.run(manager.broadcast({"type": "market_update", "data": "test_data"}))
         
         data = websocket.receive_json()
-        assert data["type"] == "update"
+        assert data["type"] == "market_update"
         assert data["data"] == "test_data"
