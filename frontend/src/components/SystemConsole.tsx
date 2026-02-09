@@ -3,7 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
-export interface SystemConsoleHandle {
+export type SystemConsoleHandle = {
   writeLog: (message: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
 }
 
@@ -19,21 +19,29 @@ const SystemConsole = forwardRef<SystemConsoleHandle>((_, ref) => {
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 10,
-      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
       theme: {
         background: '#1a1a1a',
         foreground: '#00ff41',
         cursor: '#00ff41',
         selectionBackground: 'rgba(0, 255, 65, 0.3)',
       },
-      convertEol: True,
+      convertEol: true,
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     
     term.open(terminalRef.current);
-    fitAddon.fit();
+    
+    // Use a small timeout to ensure the container is rendered before fitting
+    setTimeout(() => {
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        console.error('Xterm fit error:', e);
+      }
+    }, 100);
 
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
@@ -43,7 +51,11 @@ const SystemConsole = forwardRef<SystemConsoleHandle>((_, ref) => {
 
     // Handle window resize
     const handleResize = () => {
-      fitAddon.fit();
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        // Ignore resize errors
+      }
     };
     window.addEventListener('resize', handleResize);
 
@@ -64,12 +76,16 @@ const SystemConsole = forwardRef<SystemConsoleHandle>((_, ref) => {
       if (type === 'error') colorCode = '\x1b[1;31m';   // Red
       if (type === 'warning') colorCode = '\x1b[1;33m'; // Yellow
 
-      xtermRef.current.writeln(`[\x1b[90m${timestamp}\x1b[0m] ${colorCode}${message.toUpperCase()}\x1b[0m`);
+      try {
+        xtermRef.current.writeln(`[\x1b[90m${timestamp}\x1b[0m] ${colorCode}${message.toUpperCase()}\x1b[0m`);
+      } catch (e) {
+        console.error('Xterm write error:', e);
+      }
     }
   }));
 
   return (
-    <div className="h-full w-full bg-terminal-header p-1">
+    <div className="h-full w-full bg-[#1a1a1a] p-1 overflow-hidden">
       <div ref={terminalRef} className="h-full w-full" />
     </div>
   );

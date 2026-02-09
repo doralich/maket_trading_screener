@@ -1,0 +1,13 @@
+{
+  "name": "tradingview",
+  "version": "1.0.0",
+  "description": "TradingView Local Screener",
+  "scripts": {
+    "backend": "cd backend && PYTHONPATH=. ../venv/bin/uvicorn app.main:app --port 8000 --reload",
+    "frontend": "cd frontend && npm run dev",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"magenta,cyan\" \"npm run backend\" \"npm run frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

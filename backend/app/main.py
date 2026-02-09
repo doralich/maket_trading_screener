@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from app.services.screener import ScreenerService
 from typing import List
 import asyncio
@@ -33,7 +34,8 @@ async def broadcast_updates():
     while True:
         if manager.active_connections:
             try:
-                updates = screener_service.get_top_movers(limit=10)
+                # Increased limit to 50 to match initial load
+                updates = screener_service.get_top_movers(limit=50)
                 await manager.broadcast({
                     "type": "market_update",
                     "data": updates
@@ -52,15 +54,34 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TradingView Screener API", lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         await websocket.send_json({"type": "welcome", "message": "Connected to TradingView Screener WebSocket"})
+        
+        # Trigger immediate data fetch for the new client
+        try:
+            initial_data = screener_service.get_top_movers(limit=50)
+            await websocket.send_json({
+                "type": "market_update",
+                "data": initial_data
+            })
+            print(f"Sent initial update: {len(initial_data)} assets")
+        except Exception as e:
+            print(f"Error sending initial update: {e}")
+
         while True:
             # Keep connection open
-            data = await websocket.receive_text()
-            # Echo or handle commands if needed
+            await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

@@ -5,20 +5,17 @@
 :root {
   background-color: #0d0d0d;
   color: #00ff41;
-  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  padding: 0;
+  background-color: #0d0d0d;
   min-height: 100vh;
-  overflow-x: hidden;
 }
 
 #root {
-  width: 100%;
+  min-height: 100vh;
 }
 
 .terminal-glow {
