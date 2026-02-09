@@ -16,9 +16,9 @@
 - [x] Task: React Dashboard Scaffolding (114cdc1)
     - [x] Initialize React project with Tailwind CSS (114cdc1)
     - [x] Implement the "Retro-Future Terminal" base layout (114cdc1) (dark mode, monospaced fonts)
-- [ ] Task: WebSocket Client Integration
-    - [ ] Implement a WebSocket client in React to receive market data updates
-    - [ ] Establish connection and handle data reception
+- [x] Task: WebSocket Client Integration (abdf478)
+    - [x] Implement a WebSocket client in React (abdf478) to receive market data updates
+    - [x] Establish connection and handle data reception (abdf478)
 - [ ] Task: Interactive Data Table
     - [ ] Build the main data table component to display crypto tickers and performance
     - [ ] Implement color-coded highlights for price changes
