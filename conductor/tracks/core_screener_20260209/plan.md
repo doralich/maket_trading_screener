@@ -1,9 +1,9 @@
 # Implementation Plan: Core Crypto Screener & Terminal UI
 
 ## Phase 1: Foundation & Backend Setup
-- [ ] Task: Project Scaffolding
-    - [ ] Initialize FastAPI project structure
-    - [ ] Configure `pip` virtual environment and install dependencies (`fastapi`, `uvicorn`, `tvscreener`, `pandas`)
+- [x] Task: Project Scaffolding (4215321)
+    - [x] Initialize FastAPI project structure (4215321)
+    - [x] Configure `pip` virtual environment and install dependencies (4215321) (`fastapi`, `uvicorn`, `tvscreener`, `pandas`)
 - [ ] Task: tvscreener Integration
     - [ ] Implement a service to fetch top-moving crypto assets using `tvscreener`
     - [ ] Create an endpoint for ticker search and data retrieval
