@@ -1,0 +1,80 @@
+import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { Terminal } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import 'xterm/css/xterm.css';
+
+export interface SystemConsoleHandle {
+  writeLog: (message: string, type?: 'info' | 'success' | 'error' | 'warning') => void;
+}
+
+const SystemConsole = forwardRef<SystemConsoleHandle>((_, ref) => {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+
+  useEffect(() => {
+    if (!terminalRef.current) return;
+
+    // Initialize xterm.js
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 10,
+      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      theme: {
+        background: '#1a1a1a',
+        foreground: '#00ff41',
+        cursor: '#00ff41',
+        selectionBackground: 'rgba(0, 255, 65, 0.3)',
+      },
+      convertEol: True,
+    });
+
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    
+    term.open(terminalRef.current);
+    fitAddon.fit();
+
+    xtermRef.current = term;
+    fitAddonRef.current = fitAddon;
+
+    term.writeln('\x1b[1;32m[ SYSTEM_INITIALIZED ]\x1b[0m');
+    term.writeln('READY_FOR_DATA_STREAM...');
+
+    // Handle window resize
+    const handleResize = () => {
+      fitAddon.fit();
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      term.dispose();
+    };
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    writeLog: (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+      if (!xtermRef.current) return;
+
+      const timestamp = new Date().toLocaleTimeString();
+      let colorCode = '\x1b[32m'; // Default green (info)
+      
+      if (type === 'success') colorCode = '\x1b[1;32m'; // Bright green
+      if (type === 'error') colorCode = '\x1b[1;31m';   // Red
+      if (type === 'warning') colorCode = '\x1b[1;33m'; // Yellow
+
+      xtermRef.current.writeln(`[\x1b[90m${timestamp}\x1b[0m] ${colorCode}${message.toUpperCase()}\x1b[0m`);
+    }
+  }));
+
+  return (
+    <div className="h-full w-full bg-terminal-header p-1">
+      <div ref={terminalRef} className="h-full w-full" />
+    </div>
+  );
+});
+
+SystemConsole.displayName = 'SystemConsole';
+
+export default SystemConsole;
