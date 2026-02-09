@@ -44,17 +44,35 @@ async def broadcast_updates():
                 print(f"Error in broadcast task: {e}")
         await asyncio.sleep(10) # Update every 10 seconds
 
-from app.database import init_db
+from app.database import init_db, engine
+from app.services.indexer import IndexerService
+from sqlmodel import Session
+
+async def run_ticker_indexer():
+    """
+    Background task to periodically sync the ticker index.
+    Runs every 24 hours.
+    """
+    while True:
+        try:
+            with Session(engine) as session:
+                indexer = IndexerService(session)
+                indexer.sync_tickers()
+        except Exception as e:
+            print(f"Error in ticker indexer task: {e}")
+        await asyncio.sleep(24 * 3600) # Run every 24 hours
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize the database
     init_db()
-    # Start the background task
+    # Start the background tasks
     task = asyncio.create_task(broadcast_updates())
+    index_task = asyncio.create_task(run_ticker_indexer())
     yield
-    # Shutdown: Cancel the task
+    # Shutdown: Cancel the tasks
     task.cancel()
+    index_task.cancel()
 
 app = FastAPI(title="TradingView Screener API", lifespan=lifespan)
 

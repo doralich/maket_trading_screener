@@ -1,6 +1,9 @@
 from tvscreener import CryptoScreener
 import pandas as pd
 import numpy as np
+from sqlmodel import Session, select
+from app.models import TickerIndex
+from app.database import engine
 
 class ScreenerService:
     def __init__(self):
@@ -13,29 +16,18 @@ class ScreenerService:
         print(f"DEBUG: Fetching top {limit} movers with indicators...")
         try:
             cs = CryptoScreener()
-            
-            # Explicitly select common technical indicators
-            # The library supports selecting by category or individual fields
-            # We use the columns found in the diagnostic earlier for reliability
             df = cs.get()
             
             if df.empty:
                 print("DEBUG: TradingView returned empty dataframe.")
                 return self._get_fallback_data()
 
-            # Ensure we have the columns we need
-            # The diagnostic showed these exist:
-            # 'Relative Strength Index (14)', 'MACD Level (12, 26)', 'Simple Moving Average (20)', etc.
-            
             print(f"DEBUG: Successfully fetched {len(df)} assets.")
             
-            # Sort by Change % by default
             sort_col = 'Change %' if 'Change %' in df.columns else df.columns[0]
             df = df.sort_values(by=sort_col, ascending=False)
                 
             top_df = df.head(limit)
-            
-            # Replace NaN with None for JSON serialization
             top_df = top_df.replace({np.nan: None})
             
             return top_df.to_dict(orient='records')
@@ -45,17 +37,17 @@ class ScreenerService:
 
     def search_ticker(self, query: str):
         """
-        Searches for a specific crypto ticker.
+        Searches for a specific crypto ticker in the local index.
         """
+        print(f"DEBUG: Searching for '{query}' in local index...")
         try:
-            cs = CryptoScreener()
-            df = cs.get()
-            
-            col = 'Symbol' if 'Symbol' in df.columns else 'ticker'
-            if col in df.columns:
-                search_df = df[df[col].str.contains(query, case=False, na=False)]
-                search_df = search_df.replace({np.nan: None})
-                return search_df.to_dict(orient='records')
+            with Session(engine) as session:
+                statement = select(TickerIndex).where(
+                    (TickerIndex.symbol.contains(query)) | 
+                    (TickerIndex.name.contains(query))
+                )
+                results = session.exec(statement.limit(50)).all()
+                return [r.model_dump() for r in results]
         except Exception as e:
             print(f"DEBUG: Search error: {e}")
         
