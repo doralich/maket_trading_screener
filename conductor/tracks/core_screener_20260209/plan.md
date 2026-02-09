@@ -1,6 +1,6 @@
 # Implementation Plan: Core Crypto Screener & Terminal UI
 
-## Phase 1: Foundation & Backend Setup
+## Phase 1: Foundation ## Phase 1: Foundation & Backend Setup Backend Setup [checkpoint: 928f842]
 - [x] Task: Project Scaffolding (4215321)
     - [x] Initialize FastAPI project structure (4215321)
     - [x] Configure `pip` virtual environment and install dependencies (4215321) (`fastapi`, `uvicorn`, `tvscreener`, `pandas`)
