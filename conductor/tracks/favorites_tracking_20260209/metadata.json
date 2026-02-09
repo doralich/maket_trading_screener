@@ -1,0 +1,8 @@
+{
+  "track_id": "favorites_tracking_20260209",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-09T22:50:00Z",
+  "updated_at": "2026-02-09T22:50:00Z",
+  "description": "limited tickers(50) available, I want all the tickers from those exchange to be available for me to search & add as favorable tickers,then add my favorite tickers as "ASSETS_TRACKED" on the main dashboard. price detail should be 5m/10m/15m/1h/2h/4h/6h/12h/1D/1W/1M with 6 months data storage"
+}
