@@ -89,8 +89,17 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
+from app.services.favorites import FavoritesService
+from pydantic import BaseModel
+
+class FavoriteCreate(BaseModel):
+    symbol: str
+
+favorites_service = FavoritesService()
+
 api_router = APIRouter(prefix="/api/v1")
 screener_router = APIRouter(prefix="/screener")
+favorites_router = APIRouter(prefix="/favorites")
 
 @screener_router.get("/top-movers")
 async def get_top_movers(limit: int = 50):
@@ -100,7 +109,21 @@ async def get_top_movers(limit: int = 50):
 async def search_ticker(q: str = Query(..., min_length=1)):
     return screener_service.search_ticker(q)
 
+@favorites_router.get("")
+async def get_favorites():
+    return favorites_service.get_favorites()
+
+@favorites_router.post("", status_code=201)
+async def add_favorite(favorite: FavoriteCreate):
+    return favorites_service.add_favorite(favorite.symbol)
+
+@favorites_router.delete("/{symbol}", status_code=204)
+async def remove_favorite(symbol: str):
+    favorites_service.remove_favorite(symbol)
+    return None
+
 api_router.include_router(screener_router)
+api_router.include_router(favorites_router)
 app.include_router(api_router)
 
 @app.get("/")
