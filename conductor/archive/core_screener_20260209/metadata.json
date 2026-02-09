@@ -1,0 +1,8 @@
+{
+  "track_id": "core_screener_20260209",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-09T09:38:13Z",
+  "updated_at": "2026-02-09T09:38:13Z",
+  "description": "Build the core crypto screener backend and a basic terminal-style dashboard UI."
+}
