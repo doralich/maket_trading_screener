@@ -52,13 +52,19 @@ const App: React.FC = () => {
         const history = await response.json();
         if (history.length > 0) {
           const latest = history[0];
+          
+          // Check if we have fresher data from WebSocket for this symbol
+          const wsUpdate = marketData.find(d => d.Symbol === latest.symbol);
+          
           newData.push({
             Symbol: latest.symbol,
-            Price: latest.close,
-            'Change %': 0, // We could calculate this from history if needed
+            Price: wsUpdate?.Price ?? latest.close,
+            'Change %': wsUpdate?.['Change %'] ?? 0,
             Exchange: fav.symbol.split(':')[0],
             Description: '',
-            ...latest.indicators
+            ...latest.indicators,
+            // Override with latest indicators from WS if available and it's the default interval
+            ...(activeInterval === '5' ? wsUpdate : {})
           });
         }
       } catch (error) {
@@ -72,9 +78,10 @@ const App: React.FC = () => {
     fetchFavorites();
   }, []);
 
+  // Update tracked data when favorites, interval, or new market data arrives
   useEffect(() => {
     fetchTrackedData();
-  }, [favorites, activeInterval]);
+  }, [favorites, activeInterval, marketData]);
 
   useEffect(() => {
     const connect = () => {
@@ -178,13 +185,19 @@ const App: React.FC = () => {
                 {intervals.map(int => <option key={int} value={int}>{int === '1D' ? 'DAILY' : int === '1W' ? 'WEEKLY' : int === '1M' ? 'MONTHLY' : int + 'M'}</option>)}
               </select>
             </div>
-            <div className="text-xl font-bold terminal-glow">{favorites.length}</div>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {trackedData.map(d => (
-                <span key={d.Symbol} className="text-[8px] border border-[#00ff41]/20 px-1 bg-black/50">
-                  {d.Symbol.split(':')[1]}
-                </span>
-              ))}
+            <div className="flex items-baseline space-x-2">
+              <div className="text-xl font-bold terminal-glow">{favorites.length}</div>
+              <div className="text-[8px] opacity-50 uppercase">TOTAL_PERSISTED</div>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {trackedData.map(d => {
+                const chg = d['Change %'] ?? 0;
+                return (
+                  <span key={d.Symbol} className={`text-[8px] border ${chg >= 0 ? 'border-[#00ff41]/20 text-[#00ff41]' : 'border-red-500/20 text-red-500'} px-1 bg-black/50`}>
+                    {d.Symbol.split(':')[1]}
+                  </span>
+                );
+              })}
             </div>
           </div>
           <div className="border border-[#00ff41] p-2 bg-[#1a1a1a]">
