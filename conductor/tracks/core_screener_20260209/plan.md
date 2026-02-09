@@ -19,9 +19,9 @@
 - [x] Task: WebSocket Client Integration (abdf478)
     - [x] Implement a WebSocket client in React (abdf478) to receive market data updates
     - [x] Establish connection and handle data reception (abdf478)
-- [ ] Task: Interactive Data Table
-    - [ ] Build the main data table component to display crypto tickers and performance
-    - [ ] Implement color-coded highlights for price changes
+- [x] Task: Interactive Data Table (ef30e24)
+    - [x] Build the main data table component (ef30e24) to display crypto tickers and performance
+    - [x] Implement color-coded highlights for price changes (ef30e24)
 - [ ] Task: Xterm.js Console Log
     - [ ] Integrate Xterm.js to display a system log of data fetches and status updates
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Frontend & Terminal UI' (Protocol in workflow.md)
