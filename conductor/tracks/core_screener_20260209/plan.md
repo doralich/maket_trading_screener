@@ -7,9 +7,9 @@
 - [x] Task: tvscreener Integration (7023cb4)
     - [x] Implement a service to fetch top-moving crypto assets (7023cb4) using `tvscreener`
     - [x] Create an endpoint for ticker search and data retrieval (7023cb4)
-- [ ] Task: WebSocket Server Implementation
-    - [ ] Implement a WebSocket endpoint in FastAPI to broadcast market updates
-    - [ ] Add basic periodic polling logic to push updates to connected clients
+- [x] Task: WebSocket Server Implementation (ab8e270)
+    - [x] Implement a WebSocket endpoint in FastAPI (ab8e270) to broadcast market updates
+    - [x] Add basic periodic polling logic (ab8e270) to push updates to connected clients
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Foundation & Backend Setup' (Protocol in workflow.md)
 
 ## Phase 2: Frontend & Terminal UI
