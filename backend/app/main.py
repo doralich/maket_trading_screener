@@ -46,6 +46,7 @@ async def broadcast_updates():
 
 from app.database import init_db, engine
 from app.services.indexer import IndexerService
+from app.services.collector import CollectorService
 from sqlmodel import Session
 
 async def run_ticker_indexer():
@@ -62,6 +63,32 @@ async def run_ticker_indexer():
             print(f"Error in ticker indexer task: {e}")
         await asyncio.sleep(24 * 3600) # Run every 24 hours
 
+async def run_data_collector():
+    """
+    Background task to collect data for favorite tickers.
+    Runs every 5 minutes.
+    """
+    collector = CollectorService()
+    while True:
+        try:
+            collector.collect_all()
+        except Exception as e:
+            print(f"Error in data collector task: {e}")
+        await asyncio.sleep(5 * 60) # Run every 5 minutes
+
+async def run_data_purger():
+    """
+    Background task to purge old market data history.
+    Runs every 24 hours.
+    """
+    collector = CollectorService()
+    while True:
+        try:
+            collector.purge_old_data()
+        except Exception as e:
+            print(f"Error in data purger task: {e}")
+        await asyncio.sleep(24 * 3600) # Run every 24 hours
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize the database
@@ -69,10 +96,14 @@ async def lifespan(app: FastAPI):
     # Start the background tasks
     task = asyncio.create_task(broadcast_updates())
     index_task = asyncio.create_task(run_ticker_indexer())
+    collect_task = asyncio.create_task(run_data_collector())
+    purge_task = asyncio.create_task(run_data_purger())
     yield
     # Shutdown: Cancel the tasks
     task.cancel()
     index_task.cancel()
+    collect_task.cancel()
+    purge_task.cancel()
 
 app = FastAPI(title="TradingView Screener API", lifespan=lifespan)
 
