@@ -1,0 +1,144 @@
+Help on class CryptoScreener in module tvscreener.core.crypto:
+
+class CryptoScreener(tvscreener.core.base.Screener)
+ |  Crypto screener for querying cryptocurrencies from TradingView.
+ |
+ |  Method resolution order:
+ |      CryptoScreener
+ |      tvscreener.core.base.Screener
+ |      builtins.object
+ |
+ |  Methods defined here:
+ |
+ |  __init__(self)
+ |      Initialize self.  See help(type(self)) for accurate signature.
+ |
+ |  ----------------------------------------------------------------------
+ |  Data and other attributes defined here:
+ |
+ |  __annotations__ = {}
+ |
+ |  ----------------------------------------------------------------------
+ |  Methods inherited from tvscreener.core.base.Screener:
+ |
+ |  add_filter(
+ |      self,
+ |      filter_type: tvscreener.field.Field | tvscreener.filter.ExtraFilter,
+ |      operation: tvscreener.filter.FilterOperator,
+ |      values: enum.Enum
+ |  )
+ |
+ |  add_misc(self, key, value)
+ |
+ |  add_option(self, key, value)
+ |
+ |  get(self, print_request=False)
+ |      Get the screener data from TradingView.
+ |
+ |      :param print_request: If True, prints the request URL and payload for debugging.
+ |      :return: ScreenerDataFrame containing the screener results
+ |      :raises MalformedRequestException: If the API request fails
+ |      :raises requests.RequestException: If there's a network error
+ |
+ |  remove_filter(
+ |      self,
+ |      filter_type: tvscreener.filter.ExtraFilter | tvscreener.field.Field
+ |  )
+ |
+ |  search(self, value: str)
+ |
+ |  select(self, *fields: tvscreener.field.Field) -> 'Screener'
+ |      Set fields to retrieve (fluent method).
+ |
+ |      :param fields: Fields to include in results
+ |      :return: self for method chaining
+ |
+ |      Example:
+ |          >>> ss = StockScreener()
+ |          >>> ss.select(StockField.NAME, StockField.PRICE, StockField.VOLUME)
+ |
+ |  select_all(self) -> 'Screener'
+ |      Select all available fields for this screener type.
+ |
+ |      :return: self for method chaining
+ |
+ |      Example:
+ |          >>> ss = StockScreener()
+ |          >>> ss.select_all()
+ |          >>> df = ss.get()  # Returns all ~3000+ stock fields
+ |
+ |  set_index(self, *indices: tvscreener.field.IndexSymbol) -> 'Screener'
+ |      Filter screener results to only include constituents of the specified index(es).
+ |
+ |      :param indices: One or more IndexSymbol enum values
+ |      :return: self for method chaining
+ |
+ |      Example:
+ |          >>> ss = StockScreener()
+ |          >>> ss.set_index(IndexSymbol.SP500)
+ |          >>> df = ss.get()  # Returns only S&P 500 constituents
+ |
+ |          >>> # Multiple indices
+ |          >>> ss.set_index(IndexSymbol.SP500, IndexSymbol.NASDAQ_100)
+ |
+ |  set_range(self, from_range: int = 0, to_range: int = 150) -> 'Screener'
+ |
+ |  sort_by(self, sort_by: tvscreener.field.Field, ascending=True)
+ |
+ |  stream(
+ |      self,
+ |      interval: float = 5.0,
+ |      max_iterations: Optional[int] = None,
+ |      on_update: Optional[Callable[[ForwardRef('ScreenerDataFrame')], NoneType]] = None
+ |  ) -> Iterator[ForwardRef('ScreenerDataFrame')]
+ |      Stream screener data at regular intervals.
+ |
+ |      :param interval: Refresh interval in seconds (minimum 1.0 to avoid rate limiting)
+ |      :param max_iterations: Maximum number of refreshes (None = infinite)
+ |      :param on_update: Optional callback function called with each DataFrame
+ |      :yield: ScreenerDataFrame on each refresh, or None if an error occurs
+ |
+ |      Example:
+ |          >>> ss = StockScreener()
+ |          >>> for df in ss.stream(interval=10, max_iterations=5):
+ |          ...     print(f"Updated: {len(df)} rows")
+ |
+ |  where(
+ |      self,
+ |      condition_or_field,
+ |      operation: tvscreener.filter.FilterOperator = None,
+ |      value=None
+ |  ) -> 'Screener'
+ |      Add a filter condition (fluent method).
+ |
+ |      Supports two syntaxes:
+ |
+ |      1. **New Pythonic syntax** (recommended):
+ |          >>> ss.where(StockField.PRICE > 100)
+ |          >>> ss.where(StockField.VOLUME >= 1_000_000)
+ |          >>> ss.where(StockField.MARKET_CAPITALIZATION.between(1e9, 10e9))
+ |
+ |      2. **Legacy syntax** (still supported):
+ |          >>> ss.where(StockField.PRICE, FilterOperator.ABOVE, 100)
+ |
+ |      :param condition_or_field: Either a FieldCondition (from comparison) or a Field
+ |      :param operation: Filter operation (only for legacy syntax)
+ |      :param value: Value to compare against (only for legacy syntax)
+ |      :return: self for method chaining
+ |
+ |      Example:
+ |          >>> ss = StockScreener()
+ |          >>> # New syntax
+ |          >>> ss.where(StockField.PRICE > 100).where(StockField.VOLUME > 1e6)
+ |          >>> # Legacy syntax
+ |          >>> ss.where(StockField.PRICE, FilterOperator.ABOVE, 100)
+ |
+ |  ----------------------------------------------------------------------
+ |  Data descriptors inherited from tvscreener.core.base.Screener:
+ |
+ |  __dict__
+ |      dictionary for instance variables
+ |
+ |  __weakref__
+ |      list of weak references to the object
+

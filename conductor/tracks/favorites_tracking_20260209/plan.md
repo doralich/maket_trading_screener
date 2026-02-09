@@ -11,15 +11,15 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Database Schema & Favorites Management' (5fe0c2c)
 
 ## Phase 2: Background Workers & Data Sync
-- [ ] Task: Ticker Indexing Service
-    - [ ] Write tests for the full-exchange ticker indexing logic
-    - [ ] Implement background task to fetch all symbols from `tvscreener` and sync to `ticker_index`
-- [ ] Task: Multi-Timeframe Data Fetcher
-    - [ ] Write tests for fetching data across 11 intervals (5m to 1M)
-    - [ ] Implement the collector to fetch and store OHLCV + Indicators for all "Favorite" tickers
-- [ ] Task: Retention & Cleanup Logic
-    - [ ] Write tests for the 6-month + 1-day retention policy
-    - [ ] Implement the daily background worker to purge old data
+- [x] Task: Ticker Indexing Service (549c68a)
+    - [x] Write tests for the full-exchange ticker indexing logic (549c68a)
+    - [x] Implement background task to fetch all symbols from `tvscreener` and sync to `ticker_index` (549c68a)
+- [x] Task: Multi-Timeframe Data Fetcher (1c93c30)
+    - [x] Write tests for fetching data across 11 intervals (5m to 1M) (1c93c30)
+    - [x] Implement the collector to fetch and store OHLCV + Indicators for all "Favorite" tickers (1c93c30)
+- [x] Task: Retention & Cleanup Logic (1c93c30)
+    - [x] Write tests for the 6-month + 1-day retention policy (1c93c30)
+    - [x] Implement the daily background worker to purge old data (1c93c30)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Background Workers & Data Sync' (Protocol in workflow.md)
 
 ## Phase 3: Frontend Search & Dashboard Integration
