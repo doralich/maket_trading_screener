@@ -3,6 +3,7 @@ import CryptoTable from './components/CryptoTable'
 import type { MarketUpdate } from './components/CryptoTable'
 import SystemConsole from './components/SystemConsole'
 import type { SystemConsoleHandle } from './components/SystemConsole'
+import UniversalSearch from './components/UniversalSearch'
 
 interface WSMessage {
   type: string;
@@ -10,16 +11,34 @@ interface WSMessage {
   message?: string;
 }
 
+interface Favorite {
+  id: number;
+  symbol: string;
+  added_at: string;
+}
+
 const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString())
   const [marketData, setMarketData] = useState<MarketUpdate[]>([])
+  const [favorites, setFavorites] = useState<Favorite[]>([])
   const [readyState, setReadyState] = useState<number>(3) // 3 = CLOSED
   const consoleRef = useRef<SystemConsoleHandle>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
   const WS_URL = 'ws://localhost:8000/ws'
 
+  const fetchFavorites = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/favorites');
+      const data = await response.json();
+      setFavorites(data);
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
+
   useEffect(() => {
+    fetchFavorites();
     const connect = () => {
       console.log('Connecting to WebSocket...');
       const ws = new WebSocket(WS_URL);
@@ -100,11 +119,19 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-grow flex flex-col space-y-4 min-h-0 overflow-hidden">
+        {/* Search & Indexing Section */}
+        <section className="shrink-0">
+          <UniversalSearch 
+            onFavoriteAdded={fetchFavorites} 
+            favorites={favorites.map(f => f.symbol)} 
+          />
+        </section>
+
         {/* Top Section: Statistics */}
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b-2 border-[#00ff41] pb-4 shrink-0">
           <div className="border border-[#00ff41] p-2 bg-[#1a1a1a]">
             <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ ASSETS_TRACKED</h2>
-            <div className="text-xl font-bold terminal-glow">{marketData.length}</div>
+            <div className="text-xl font-bold terminal-glow">{favorites.length}</div>
           </div>
           <div className="border border-[#00ff41] p-2 bg-[#1a1a1a]">
             <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ TOP_GAINER</h2>
