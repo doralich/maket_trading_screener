@@ -10,7 +10,7 @@
     - [x] Implement `GET /api/v1/favorites` (c0afaf1)
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Database Schema & Favorites Management' (5fe0c2c)
 
-## Phase 2: Background Workers & Data Sync
+## Phase 2: Background Workers & Data Sync [checkpoint: 1a41161]
 - [x] Task: Ticker Indexing Service (549c68a)
     - [x] Write tests for the full-exchange ticker indexing logic (549c68a)
     - [x] Implement background task to fetch all symbols from `tvscreener` and sync to `ticker_index` (549c68a)
@@ -20,7 +20,7 @@
 - [x] Task: Retention & Cleanup Logic (1c93c30)
     - [x] Write tests for the 6-month + 1-day retention policy (1c93c30)
     - [x] Implement the daily background worker to purge old data (1c93c30)
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Background Workers & Data Sync' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Background Workers & Data Sync' (1a41161)
 
 ## Phase 3: Frontend Search & Dashboard Integration
 - [ ] Task: Universal Search UI
