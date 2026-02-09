@@ -21,11 +21,13 @@ const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString())
   const [marketData, setMarketData] = useState<MarketUpdate[]>([])
   const [favorites, setFavorites] = useState<Favorite[]>([])
+  const [activeInterval, setActiveInterval] = useState('5')
+  const [trackedData, setTrackedData] = useState<MarketUpdate[]>([])
   const [readyState, setReadyState] = useState<number>(3) // 3 = CLOSED
   const consoleRef = useRef<SystemConsoleHandle>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
-  const WS_URL = 'ws://localhost:8000/ws'
+  const intervals = ["5", "10", "15", "60", "120", "240", "360", "720", "1D", "1W", "1M"];
 
   const fetchFavorites = async () => {
     try {
@@ -37,8 +39,44 @@ const App: React.FC = () => {
     }
   };
 
+  const fetchTrackedData = async () => {
+    if (favorites.length === 0) {
+      setTrackedData([]);
+      return;
+    }
+
+    const newData: MarketUpdate[] = [];
+    for (const fav of favorites) {
+      try {
+        const response = await fetch(`http://localhost:8000/api/v1/favorites/history?symbol=${encodeURIComponent(fav.symbol)}&interval=${activeInterval}&limit=1`);
+        const history = await response.json();
+        if (history.length > 0) {
+          const latest = history[0];
+          newData.push({
+            Symbol: latest.symbol,
+            Price: latest.close,
+            'Change %': 0, // We could calculate this from history if needed
+            Exchange: fav.symbol.split(':')[0],
+            Description: '',
+            ...latest.indicators
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching tracked data:', error);
+      }
+    }
+    setTrackedData(newData);
+  };
+
   useEffect(() => {
     fetchFavorites();
+  }, []);
+
+  useEffect(() => {
+    fetchTrackedData();
+  }, [favorites, activeInterval]);
+
+  useEffect(() => {
     const connect = () => {
       console.log('Connecting to WebSocket...');
       const ws = new WebSocket(WS_URL);
@@ -130,8 +168,24 @@ const App: React.FC = () => {
         {/* Top Section: Statistics */}
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b-2 border-[#00ff41] pb-4 shrink-0">
           <div className="border border-[#00ff41] p-2 bg-[#1a1a1a]">
-            <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ ASSETS_TRACKED</h2>
+            <div className="flex justify-between items-center border-b border-[#00ff41]/30 mb-2">
+              <h2 className="text-[10px] font-bold opacity-70">/ ASSETS_TRACKED</h2>
+              <select 
+                value={activeInterval} 
+                onChange={(e) => setActiveInterval(e.target.value)}
+                className="bg-black text-[9px] border border-[#00ff41]/20 focus:outline-none px-1"
+              >
+                {intervals.map(int => <option key={int} value={int}>{int === '1D' ? 'DAILY' : int === '1W' ? 'WEEKLY' : int === '1M' ? 'MONTHLY' : int + 'M'}</option>)}
+              </select>
+            </div>
             <div className="text-xl font-bold terminal-glow">{favorites.length}</div>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {trackedData.map(d => (
+                <span key={d.Symbol} className="text-[8px] border border-[#00ff41]/20 px-1 bg-black/50">
+                  {d.Symbol.split(':')[1]}
+                </span>
+              ))}
+            </div>
           </div>
           <div className="border border-[#00ff41] p-2 bg-[#1a1a1a]">
             <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ TOP_GAINER</h2>
@@ -152,8 +206,15 @@ const App: React.FC = () => {
         </section>
 
         {/* Data Table Area */}
-        <section className="flex-grow min-h-0 overflow-hidden flex flex-col">
-          <CryptoTable data={marketData} />
+        <section className="flex-grow min-h-0 overflow-hidden flex flex-col space-y-4">
+          <div className="flex flex-col h-1/3 min-h-0">
+            <h2 className="text-[10px] font-bold mb-1 opacity-70">/ PERSISTED_ASSETS_DETAIL (INTERVAL: {activeInterval}M)</h2>
+            <CryptoTable data={trackedData} />
+          </div>
+          <div className="flex flex-col h-2/3 min-h-0 border-t border-[#00ff41]/30 pt-2">
+            <h2 className="text-[10px] font-bold mb-1 opacity-70">/ MARKET_TOP_MOVERS</h2>
+            <CryptoTable data={marketData} />
+          </div>
         </section>
       </main>
 

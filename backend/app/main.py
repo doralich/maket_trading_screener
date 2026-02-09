@@ -171,8 +171,11 @@ async def remove_favorite(symbol: str):
     favorites_service.remove_favorite(symbol)
     return None
 
+from app.services.favorites_history import router as fav_history_router
+
 api_router.include_router(screener_router)
 api_router.include_router(favorites_router)
+api_router.include_router(fav_history_router)
 app.include_router(api_router)
 
 @app.get("/")
