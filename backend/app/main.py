@@ -44,9 +44,13 @@ async def broadcast_updates():
                 print(f"Error in broadcast task: {e}")
         await asyncio.sleep(10) # Update every 10 seconds
 
+from app.database import init_db
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start the background task
+    # Startup: Initialize the database
+    init_db()
+    # Start the background task
     task = asyncio.create_task(broadcast_updates())
     yield
     # Shutdown: Cancel the task
