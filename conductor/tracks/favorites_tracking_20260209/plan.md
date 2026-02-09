@@ -4,10 +4,10 @@
 - [x] Task: Database Migration & Models (c7c2327)
     - [x] Create SQLite schema for `ticker_index`, `favorites`, and `market_data_history` (c7c2327)
     - [x] Implement SQLAlchemy/SQLModel entities for these tables (c7c2327)
-- [ ] Task: Favorites CRUD API
-    - [ ] Write unit tests for adding/removing/listing favorites
-    - [ ] Implement `POST /api/v1/favorites` and `DELETE /api/v1/favorites/{symbol}`
-    - [ ] Implement `GET /api/v1/favorites`
+- [x] Task: Favorites CRUD API (c0afaf1)
+    - [x] Write unit tests for adding/removing/listing favorites (c0afaf1)
+    - [x] Implement `POST /api/v1/favorites` and `DELETE /api/v1/favorites/{symbol}` (c0afaf1)
+    - [x] Implement `GET /api/v1/favorites` (c0afaf1)
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Database Schema & Favorites Management' (Protocol in workflow.md)
 
 ## Phase 2: Background Workers & Data Sync
