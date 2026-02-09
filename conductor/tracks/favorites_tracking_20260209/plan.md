@@ -23,13 +23,13 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Background Workers & Data Sync' (1a41161)
 
 ## Phase 3: Frontend Search & Dashboard Integration
-- [ ] Task: Universal Search UI
-    - [ ] Enhance the search bar to query the local `ticker_index` API
-    - [ ] Add "Favorite" toggle/star icon to search results
-- [ ] Task: "Assets Tracked" Dashboard Update
-    - [ ] Refactor dashboard to pull from `/api/v1/favorites`
-    - [ ] Implement a "Timeframe Selector" (5m, 1h, 1D, etc.) to switch the viewed data for favorites
-- [ ] Task: Style Polish & Real-time Integration
-    - [ ] Ensure favorite assets update via WebSocket alongside the main screener
-    - [ ] Refactor "ASSETS_TRACKED" UI to match the requested screenshot aesthetic
+- [x] Task: Universal Search UI (3a72b01)
+    - [x] Enhance the search bar to query the local `ticker_index` API (3a72b01)
+    - [x] Add "Favorite" toggle/star icon to search results (3a72b01)
+- [x] Task: "Assets Tracked" Dashboard Update (a40bc62)
+    - [x] Refactor dashboard to pull from `/api/v1/favorites` (a40bc62)
+    - [x] Implement a "Timeframe Selector" (5m, 1h, 1D, etc.) to switch the viewed data for favorites (a40bc62)
+- [x] Task: Style Polish & Real-time Integration (0775fa1)
+    - [x] Ensure favorite assets update via WebSocket alongside the main screener (0775fa1)
+    - [x] Refactor "ASSETS_TRACKED" UI to match the requested screenshot aesthetic (0775fa1)
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Frontend Search & Dashboard Integration' (Protocol in workflow.md)
