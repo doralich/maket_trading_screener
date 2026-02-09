@@ -1,8 +1,68 @@
-from fastapi import FastAPI, APIRouter, Query
+from fastapi import FastAPI, APIRouter, Query, WebSocket, WebSocketDisconnect
 from app.services.screener import ScreenerService
+from typing import List
+import asyncio
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="TradingView Screener API")
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                # Handle stale connections
+                pass
+
+manager = ConnectionManager()
 screener_service = ScreenerService()
+
+async def broadcast_updates():
+    """
+    Background task to periodically fetch and broadcast market updates.
+    """
+    while True:
+        if manager.active_connections:
+            try:
+                updates = screener_service.get_top_movers(limit=10)
+                await manager.broadcast({
+                    "type": "market_update",
+                    "data": updates
+                })
+            except Exception as e:
+                print(f"Error in broadcast task: {e}")
+        await asyncio.sleep(10) # Update every 10 seconds
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start the background task
+    task = asyncio.create_task(broadcast_updates())
+    yield
+    # Shutdown: Cancel the task
+    task.cancel()
+
+app = FastAPI(title="TradingView Screener API", lifespan=lifespan)
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        await websocket.send_json({"type": "welcome", "message": "Connected to TradingView Screener WebSocket"})
+        while True:
+            # Keep connection open
+            data = await websocket.receive_text()
+            # Echo or handle commands if needed
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 api_router = APIRouter(prefix="/api/v1")
 screener_router = APIRouter(prefix="/screener")
