@@ -20,8 +20,8 @@
 - **Charts/Visualization:** Lightweight Charts (TradingView) or Recharts.
 
 ## Data Persistence & Management
-- **Local Database:** **SQLite**
-    - Why: Zero-configuration, file-based database perfect for storing user preferences, saved queries, and presets locally.
+- **Local Database:** **SQLite** with **SQLModel** (SQLAlchemy + Pydantic)
+    - Why: Zero-configuration, type-safe, file-based database perfect for storing user preferences, saved queries, and presets locally.
 - **Environment Management:** `pip` with `venv` or `poetry`.
 
 ## Integrated Analysis Environment

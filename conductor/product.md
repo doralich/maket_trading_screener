@@ -23,4 +23,4 @@ I want to build a local browser based app based on the link: https://github.com/
 - **Customization:** Allow users to save their own custom indicators, presets, and query configurations locally for a personalized trading setup.
 
 ### Priority Asset Classes
-- **Cryptocurrencies:** Support for both Centralized (CEX) and Decentralized (DEX) exchanges will be the primary focus for the initial launch.
+- **Cryptocurrencies:** Focus on high-liquidity assets (Top 1500 by Market Cap) from major Centralized Exchanges (CEX): **Binance, Bybit, and Bitget**. Support includes both Spot and Perpetual contracts.
