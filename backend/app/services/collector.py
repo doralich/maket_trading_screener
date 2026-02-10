@@ -19,8 +19,10 @@ class CollectorService:
         self.indicators = {
             "RSI": CryptoField.RELATIVE_STRENGTH_INDEX_14,
             "MACD": CryptoField.MACD_LEVEL_12_26,
+            "MACD_Signal": CryptoField.MACD_SIGNAL_12_26,
             "SMA20": CryptoField.SIMPLE_MOVING_AVERAGE_20,
-            "SMA50": CryptoField.SIMPLE_MOVING_AVERAGE_50
+            "SMA50": CryptoField.SIMPLE_MOVING_AVERAGE_50,
+            "SMA200": CryptoField.SIMPLE_MOVING_AVERAGE_200
         }
 
     def _round_timestamp(self, dt: datetime, interval: str) -> datetime:

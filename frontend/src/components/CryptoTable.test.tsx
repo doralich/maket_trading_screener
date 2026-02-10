@@ -2,9 +2,11 @@ import { render, screen } from '@testing-library/react'
 import CryptoTable from './CryptoTable'
 import { expect, test } from 'vitest'
 
-const mockData = [
-  { ticker: 'BTCUSD', last: 50000, change: 2.5, volume: '10B' },
-  { ticker: 'ETHUSD', last: 3000, change: -1.2, volume: '5B' }
+import { MarketUpdate } from './CryptoTable'
+
+const mockData: MarketUpdate[] = [
+  { Symbol: 'BTCUSD', Exchange: 'BINANCE', Price: 50000, 'Change %': 2.5 },
+  { Symbol: 'ETHUSD', Exchange: 'BINANCE', Price: 3000, 'Change %': -1.2 }
 ]
 
 test('renders crypto table with data', () => {

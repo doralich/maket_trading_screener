@@ -27,6 +27,7 @@ const App: React.FC = () => {
   const consoleRef = useRef<SystemConsoleHandle>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
+  const WS_URL = 'ws://localhost:8000/ws'
   const intervals = ["5", "10", "15", "60", "120", "240", "360", "720", "1D", "1W", "1M"];
 
   const fetchFavorites = async () => {
@@ -45,33 +46,51 @@ const App: React.FC = () => {
       return;
     }
 
-    const newData: MarketUpdate[] = [];
-    for (const fav of favorites) {
-      try {
-        const response = await fetch(`http://localhost:8000/api/v1/favorites/history?symbol=${encodeURIComponent(fav.symbol)}&interval=${activeInterval}&limit=1`);
-        const history = await response.json();
-        if (history.length > 0) {
-          const latest = history[0];
-          
-          // Check if we have fresher data from WebSocket for this symbol
-          const wsUpdate = marketData.find(d => d.Symbol === latest.symbol);
-          
-          newData.push({
-            Symbol: latest.symbol,
-            Price: wsUpdate?.Price ?? latest.close,
-            'Change %': wsUpdate?.['Change %'] ?? 0,
-            Exchange: fav.symbol.split(':')[0],
-            Description: '',
-            ...latest.indicators,
-            // Override with latest indicators from WS if available and it's the default interval
-            ...(activeInterval === '5' ? wsUpdate : {})
-          });
+    try {
+      const results = await Promise.all(favorites.map(async (fav) => {
+        try {
+          const response = await fetch(`http://localhost:8000/api/v1/favorites/history?symbol=${encodeURIComponent(fav.symbol)}&interval=${activeInterval}&limit=1`);
+          const history = await response.json();
+          if (history.length > 0) {
+            const latest = history[0];
+            const wsUpdate = marketData.find(d => d.Symbol === latest.symbol);
+            
+            // Map indicator keys from DB to what CryptoTable expects
+            const indicators = latest.indicators || {};
+            const mappedIndicators: any = {
+              'Relative Strength Index (14)': indicators.RSI,
+              'MACD Level (12, 26)': indicators.MACD,
+              'MACD Signal (12, 26)': indicators.MACD_Signal,
+              'Simple Moving Average (20)': indicators.SMA20,
+              'Simple Moving Average (50)': indicators.SMA50,
+              'Simple Moving Average (200)': indicators.SMA200,
+            };
+
+            // Calculate change % if not provided by WS
+            const calculatedChange = latest.open && latest.close 
+              ? ((latest.close - latest.open) / latest.open) * 100 
+              : 0;
+            
+            return {
+              Symbol: latest.symbol,
+              Price: wsUpdate?.Price ?? latest.close,
+              'Change %': wsUpdate?.['Change %'] ?? calculatedChange,
+              Exchange: fav.symbol.split(':')[0],
+              Description: '',
+              ...mappedIndicators,
+              ...(activeInterval === '5' ? wsUpdate : {})
+            };
+          }
+        } catch (e) {
+          console.error(`Error fetching data for ${fav.symbol}:`, e);
         }
-      } catch (error) {
-        console.error('Error fetching tracked data:', error);
-      }
+        return null;
+      }));
+      
+      setTrackedData(results.filter((d): d is MarketUpdate => d !== null));
+    } catch (error) {
+      console.error('Error in batch fetch:', error);
     }
-    setTrackedData(newData);
   };
 
   useEffect(() => {
@@ -189,12 +208,13 @@ const App: React.FC = () => {
               <div className="text-xl font-bold terminal-glow">{favorites.length}</div>
               <div className="text-[8px] opacity-50 uppercase">TOTAL_PERSISTED</div>
             </div>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {trackedData.map(d => {
-                const chg = d['Change %'] ?? 0;
+            <div className="flex flex-wrap gap-1 mt-2 max-h-[40px] overflow-y-auto">
+              {favorites.map(f => {
+                const data = trackedData.find(d => d.Symbol === f.symbol);
+                const chg = data?.['Change %'] ?? 0;
                 return (
-                  <span key={d.Symbol} className={`text-[8px] border ${chg >= 0 ? 'border-[#00ff41]/20 text-[#00ff41]' : 'border-red-500/20 text-red-500'} px-1 bg-black/50`}>
-                    {d.Symbol.split(':')[1]}
+                  <span key={f.symbol} className={`text-[8px] border ${data ? (chg >= 0 ? 'border-[#00ff41]/40 text-[#00ff41]' : 'border-red-500/40 text-red-500') : 'border-white/10 text-white/30'} px-1 bg-black/50`}>
+                    {f.symbol.split(':')[1]}
                   </span>
                 );
               })}
@@ -219,14 +239,23 @@ const App: React.FC = () => {
         </section>
 
         {/* Data Table Area */}
-        <section className="flex-grow min-h-0 overflow-hidden flex flex-col space-y-4">
-          <div className="flex flex-col h-1/3 min-h-0">
-            <h2 className="text-[10px] font-bold mb-1 opacity-70">/ PERSISTED_ASSETS_DETAIL (INTERVAL: {activeInterval}M)</h2>
-            <CryptoTable data={trackedData} />
-          </div>
-          <div className="flex flex-col h-2/3 min-h-0 border-t border-[#00ff41]/30 pt-2">
-            <h2 className="text-[10px] font-bold mb-1 opacity-70">/ MARKET_TOP_MOVERS</h2>
-            <CryptoTable data={marketData} />
+        <section className="flex-grow min-h-0 overflow-hidden flex flex-col space-y-2">
+          {favorites.length > 0 && (
+            <div className="flex flex-col h-[380px] shrink-0 border border-[#00ff41]/20 p-1 bg-[#1a1a1a]/30">
+              <div className="flex justify-between items-center mb-1">
+                <h2 className="text-[10px] font-bold opacity-70">/ PERSISTED_ASSETS_DETAIL (INTERVAL: {activeInterval === '1D' ? 'DAILY' : activeInterval === '1W' ? 'WEEKLY' : activeInterval === '1M' ? 'MONTHLY' : activeInterval + 'M'})</h2>
+                <div className="text-[8px] opacity-40">SHOWING_{trackedData.length}_OF_{favorites.length}_ASSETS</div>
+              </div>
+              <div className="flex-grow overflow-auto">
+                <CryptoTable data={trackedData} />
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col flex-grow min-h-0 border-t border-[#00ff41]/30 pt-2 overflow-hidden">
+            <h2 className="text-[10px] font-bold mb-1 opacity-70">/ MARKET_TOP_MOVERS (LIVE_WS)</h2>
+            <div className="flex-grow overflow-auto">
+              <CryptoTable data={marketData} />
+            </div>
           </div>
         </section>
       </main>

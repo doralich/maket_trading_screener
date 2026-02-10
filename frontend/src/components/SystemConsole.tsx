@@ -32,36 +32,31 @@ const SystemConsole = forwardRef<SystemConsoleHandle>((_, ref) => {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     
+    // Ensure the terminal is opened before fitting
     term.open(terminalRef.current);
     
-    // Use a small timeout to ensure the container is rendered before fitting
-    setTimeout(() => {
-      try {
-        fitAddon.fit();
-      } catch (e) {
-        console.error('Xterm fit error:', e);
-      }
-    }, 100);
-
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
+
+    // Use ResizeObserver for more reliable fitting
+    const resizeObserver = new ResizeObserver(() => {
+      if (terminalRef.current && terminalRef.current.offsetWidth > 0) {
+        try {
+          fitAddon.fit();
+        } catch (e) {
+          // Ignore fit errors during rapid layout changes
+        }
+      }
+    });
+    resizeObserver.observe(terminalRef.current);
 
     term.writeln('\x1b[1;32m[ SYSTEM_INITIALIZED ]\x1b[0m');
     term.writeln('READY_FOR_DATA_STREAM...');
 
-    // Handle window resize
-    const handleResize = () => {
-      try {
-        fitAddon.fit();
-      } catch (e) {
-        // Ignore resize errors
-      }
-    };
-    window.addEventListener('resize', handleResize);
-
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       term.dispose();
+      xtermRef.current = null;
     };
   }, []);
 
