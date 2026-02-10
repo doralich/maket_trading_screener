@@ -13,11 +13,11 @@ class IndexerService:
     def sync_tickers(self):
         """
         Fetches prioritized tickers from TradingView and syncs them to the local database.
-        Includes Top 1500 Spot tickers by Market Cap and their Perpetual counterparts.
+        Includes Top 1500 assets by Market Cap and their USDT/Perpetual counterparts.
         """
         print(f"Indexer: Starting targeted sync for {self.supported_exchanges}...")
         
-        # 1. Fetch Top 1500 Spot Assets by Market Cap
+        # 1. Fetch Top 1500 Assets by Market Cap (which often uses USD/USDC pairs)
         cs = CryptoScreener()
         cs.where(CryptoField.EXCHANGE.isin(self.supported_exchanges))
         cs.sort_by(CryptoField.MARKET_CAPITALIZATION, ascending=False)
@@ -28,25 +28,46 @@ class IndexerService:
             print("Indexer: No tickers found matching criteria.")
             return 0
 
-        # 2. Identify the symbols and their potential Perp counterparts
-        top_symbols = set(df_top['Symbol'].tolist())
-        perp_candidates = []
-        for symbol in top_symbols:
-            if not symbol.endswith(".P"):
-                # If it's a spot (e.g. BINANCE:BTCUSDT), suggest its perp (e.g. BINANCE:BTCUSDT.P)
-                perp_candidates.append(f"{symbol}.P")
+        # 2. Extract Base Assets and construct candidates (USDT and USDT.P)
+        # We identify the base by stripping known quotes
+        quotes = ["USDT", "USDC", "USD", "BTC", "ETH", "BNB", "EUR", "TRY", "JPY", "GBP"]
+        base_assets = set()
+        for _, row in df_top.iterrows():
+            name = row.get('Name', '')
+            # Clean name (remove .P if present)
+            clean_name = name.replace(".P", "")
+            base = clean_name
+            for quote in quotes:
+                if clean_name.endswith(quote) and len(clean_name) > len(quote):
+                    base = clean_name[:-len(quote)]
+                    break
+            base_assets.add((row['Exchange'], base))
 
-        # 3. Fetch the Perp counterparts specifically
-        cs_perp = CryptoScreener()
-        # Directly target the candidates
-        cs_perp.symbols = {"tickers": perp_candidates}
-        try:
-            df_perps = cs_perp.get()
-        except Exception:
-            df_perps = pd.DataFrame()
+        # 3. Build a list of all candidates we want to ensure are in the index
+        candidates = []
+        for exchange, base in base_assets:
+            candidates.append(f"{exchange}:{base}USDT")
+            candidates.append(f"{exchange}:{base}USDT.P")
+        
+        # 4. Fetch all those candidates explicitly to validate and get metadata
+        # We do this in chunks because 'tickers' filter has limits
+        all_candidate_data = []
+        chunk_size = 100
+        candidate_list = list(set(candidates))
+        
+        for i in range(0, len(candidate_list), chunk_size):
+            chunk = candidate_list[i:i + chunk_size]
+            cs_cand = CryptoScreener()
+            cs_cand.symbols = {"tickers": chunk}
+            try:
+                df_cand = cs_cand.get()
+                all_candidate_data.append(df_cand)
+            except Exception:
+                pass
 
-        # 4. Combine and Sync
-        df_final = pd.concat([df_top, df_perps]).drop_duplicates(subset=['Symbol'])
+        # 5. Combine and Sync
+        df_cand_combined = pd.concat(all_candidate_data) if all_candidate_data else pd.DataFrame()
+        df_final = pd.concat([df_top, df_cand_combined]).drop_duplicates(subset=['Symbol'])
         valid_symbols = set(df_final['Symbol'].tolist())
         
         total_indexed = 0
