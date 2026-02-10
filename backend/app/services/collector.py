@@ -60,38 +60,41 @@ class CollectorService:
 
             # We'll fetch in batches if there are many symbols, but for now just all
             cs = CryptoScreener()
-            # Filter by symbols
-            # TradingView allows specific symbols in the request
-            # We can use the 'symbols' field in the payload
-            # tvscreener doesn't seem to have a direct 'set_symbols' method,
-            # but we can use 'where(CryptoField.SYMBOL.isin(symbols))'
-            
-            # Since symbols are formatted like 'BINANCE:BTCUSDT', we match against the symbol column
-            # Wait, I found 'symbol' was problematic. Let's use 'name' and 'exchange'?
-            # Or just 'symbol' if I can fix the filter.
-            # In the previous error, it said Unknown field "symbol".
-            # Let's try 'name' instead. But 'name' is just 'BTCUSDT' (no exchange).
-            
-            # Alternative: use the internal symbol list in tvscreener if possible.
-            
-            # For now, let's just fetch everything and filter locally for simplicity,
-            # or try a better filter if we can identify the correct field.
-            # Actually, I'll fetch ALL and only save those in our favorite list.
+            # Directly target favorite tickers
+            cs.symbols = {"tickers": symbols}
             
             # To get all intervals in one request for many tickers, the payload grows.
-            # We select NAME, OPEN, HIGH, LOW, PRICE, VOLUME + Indicators for each interval.
             fields = [CryptoField.NAME]
             
             # This will create a LOT of columns. 11 intervals * (5 OHLCV + 4 Indicators) = 99 columns!
             # Plus the base columns.
             for interval in self.intervals:
-                fields.append(CryptoField.OPEN.with_interval(interval))
-                fields.append(CryptoField.HIGH.with_interval(interval))
-                fields.append(CryptoField.LOW.with_interval(interval))
-                fields.append(CryptoField.PRICE.with_interval(interval))
-                fields.append(CryptoField.VOLUME.with_interval(interval))
+                # We create copies and set historical=False to avoid tvscreener automatically
+                # requesting [1] fields which fail for many custom intervals (like 10m).
+                f_open = CryptoField.OPEN.with_interval(interval)
+                f_open.historical = False
+                fields.append(f_open)
+                
+                f_high = CryptoField.HIGH.with_interval(interval)
+                f_high.historical = False
+                fields.append(f_high)
+                
+                f_low = CryptoField.LOW.with_interval(interval)
+                f_low.historical = False
+                fields.append(f_low)
+                
+                f_close = CryptoField.PRICE.with_interval(interval)
+                f_close.historical = False
+                fields.append(f_close)
+                
+                f_vol = CryptoField.VOLUME.with_interval(interval)
+                f_vol.historical = False
+                fields.append(f_vol)
+
                 for name, ind in self.indicators.items():
-                    fields.append(ind.with_interval(interval))
+                    f_ind = ind.with_interval(interval)
+                    f_ind.historical = False
+                    fields.append(f_ind)
 
             cs.select(*fields)
             
