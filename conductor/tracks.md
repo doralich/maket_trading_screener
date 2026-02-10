@@ -6,8 +6,3 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: Favorite Tickers & Multi-Timeframe Historical Data Persistence**
 *Link: [./tracks/favorites_tracking_20260209/](./tracks/favorites_tracking_20260209/)*
-
----
-
-- [x] **Track: Targeted Indexing & Exchange Filtering**
-*Link: [./tracks/targeted_indexing_20260209/](./tracks/targeted_indexing_20260209/)*
