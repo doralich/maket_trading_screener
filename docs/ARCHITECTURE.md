@@ -23,6 +23,7 @@ graph TD
         ScreenerSvc[ScreenerService]
         CollectorSvc[CollectorService]
         IndexerSvc[IndexerService]
+        FavSvc[FavoritesService]
         
         subgraph BackgroundTasks["Background Workers"]
             W1[broadcast_updates - 5s]
@@ -51,20 +52,30 @@ graph TD
     SSH -->|Starts| Backend
     SSH -->|Starts| Frontend
 
-    ScreenerSvc <-->|Fetch| TV
-    CollectorSvc -->|Fetch| TV
-    IndexerSvc -->|Fetch| TV
+    %% Fetching Logic
+    ScreenerSvc -->|Fetch Movers| TV
+    CollectorSvc -->|Fetch History| TV
+    IndexerSvc -->|Fetch Tickers| TV
 
+    %% Write to DB
     CollectorSvc -->|Persist History| DB
-    IndexerSvc -->|Sync Tickers| DB
-    ScreenerSvc -.->|Read Index| DB
+    IndexerSvc -->|Sync Index| DB
+    FavSvc -->|Manage Favs| DB
 
+    %% Read from DB (Return Paths)
+    DB -->|Read Index| ScreenerSvc
+    DB -->|Load History| App
+    DB -->|Load Favs| FavSvc
+
+    %% Internal Backend Routing
     App --> ScreenerSvc
     App --> CollectorSvc
     App --> IndexerSvc
+    App --> FavSvc
 
+    %% App to Frontend
     MainApp <-->|WebSocket: Real-time| App
-    MainApp <-->|REST: Initial Data / Favs| App
+    MainApp <-->|REST: Search/Favs/Live| App
 
     MainApp --> Search
     MainApp --> Table
@@ -89,10 +100,11 @@ graph TD
 - **Path**: `TradingView API` -> `CollectorService` -> `SQLModel` -> `tradingview.db`.
 - **Retention**: Data is persisted for up to 6 months for "Favorite" assets across 11 timeframes.
 
-### 3. Ticker Indexing
+### 3. Ticker Indexing & Search
 - **Mechanism**: The `IndexerService` runs once every 24 hours.
-- **Path**: `TradingView API` -> `IndexerService` -> `SQLite (ticker_index)`.
-- **Purpose**: Enables the `UniversalSearch` to instantly find all ~5,800+ tickers from the "Big Four" exchanges (Binance, Bybit, Bitget, OKX).
+- **Sync Path**: `TradingView API` -> `IndexerService` -> `SQLite (ticker_index)`.
+- **Search Path**: `UniversalSearch` -> `API` -> `ScreenerService` -> `SQLite (Read Index)` -> `Search Results`.
+- **Purpose**: Enables instant ticker lookup from the local 5,800+ asset catalog.
 
 ---
 
