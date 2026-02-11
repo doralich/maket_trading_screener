@@ -1,6 +1,6 @@
-# Project Architecture
+# Project Architecture & Technical Deep-Dive
 
-This document provides a high-level overview of the Market Trading Screener architecture, logic flow, and technology stack.
+This document provides a comprehensive technical overview of the Market Trading Screener. It details the system's architecture, data synchronization logic, and the full-stack development process.
 
 ## System Architecture Diagram
 
@@ -53,19 +53,19 @@ graph TD
     SSH -->|Starts| Frontend
 
     %% Fetching Logic
-    ScreenerSvc -->|Fetch Movers| TV
+    ScreenerSvc -->|Fetch Movers/Losers| TV
     CollectorSvc -->|Fetch History| TV
-    IndexerSvc -->|Fetch Tickers| TV
+    IndexerSvc -->|Fetch Full Catalog| TV
 
     %% Write to DB
     CollectorSvc -->|Persist History| DB
     IndexerSvc -->|Sync Index| DB
-    FavSvc -->|Manage Favs| DB
+    FavSvc -->|Manage Tickers| DB
 
     %% Read from DB (Return Paths)
     DB -->|Read Index| ScreenerSvc
-    DB -->|Load History| App
-    DB -->|Load Favs| FavSvc
+    DB -->|Load Favorite History| App
+    DB -->|Load Tracked List| FavSvc
 
     %% Internal Backend Routing
     App --> ScreenerSvc
@@ -74,8 +74,8 @@ graph TD
     App --> FavSvc
 
     %% App to Frontend
-    MainApp <-->|WebSocket: Real-time| App
-    MainApp <-->|REST: Search/Favs/Live| App
+    MainApp <-->|WebSocket: Real-time Movers| App
+    MainApp <-->|REST: Initial Data / Favorites / Losers| App
 
     MainApp --> Search
     MainApp --> Table
@@ -88,63 +88,58 @@ graph TD
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
 ```
 
-## Data Flow Logic
+---
 
-### 1. Real-time Market Data
-- **Mechanism**: The backend runs a `broadcast_updates` worker every 5 seconds.
-- **Path**: `TradingView API` -> `ScreenerService` -> `FastAPI WebSocket` -> `React App State` -> `CryptoTable UI`.
-- **Optimization**: Data is pushed via WebSockets to connected clients only when active, minimizing unnecessary API calls.
+## Core Logic & Synchronization
 
-### 2. Historical Data Collection
-- **Mechanism**: The `CollectorService` runs every 5 minutes.
-- **Path**: `TradingView API` -> `CollectorService` -> `SQLModel` -> `tradingview.db`.
-- **Retention**: Data is persisted for up to 6 months for "Favorite" assets across 11 timeframes.
+### 1. Hybrid Data Fetching (WebSocket vs. Polling)
+The application uses a dual-channel communication strategy to ensure the UI is always responsive:
+- **WebSocket (Push)**: The backend runs a `broadcast_updates` worker every 5 seconds. It pushes the latest **Top Movers** data to all connected clients. This is the primary channel for real-time price action.
+- **REST API (Pull/Polling)**:
+    - **Initial Load**: When the app starts, it performs a REST fetch for the first snapshot.
+    - **Top Losers**: Since the WebSocket broadcast is optimized for gainers, the **Top Losers** tab uses a 5-second interval poller to fetch data from the `/api/v1/screener/top-movers?sort=asc` endpoint.
+    - **Favorites**: The **Tracked Assets** table fetches data via REST to allow for complex interval-switching (e.g., viewing 1H data while the main movers are on 5M).
 
-### 3. Ticker Indexing & Search
-- **Mechanism**: The `IndexerService` runs once every 24 hours.
-- **Sync Path**: `TradingView API` -> `IndexerService` -> `SQLite (ticker_index)`.
-- **Search Path**: `UniversalSearch` -> `API` -> `ScreenerService` -> `SQLite (Read Index)` -> `Search Results`.
-- **Purpose**: Enables instant ticker lookup from the local 5,800+ asset catalog.
+### 2. Market-Wide Sorting (Server-Side)
+Unlike basic screeners that sort a pre-loaded list, this system performs **Server-Side Sorting**:
+- When you request "Top Losers," the backend sends a sort command to TradingView's servers: `cs.sort_by("change|X", ascending=True)`.
+- This ensures the results are drawn from the **entire ~5,800+ ticker catalog**, not just the coins currently visible on your screen.
+
+### 3. Liquidity & Quality Filtering
+To prevent "Flash Crashes" on dead coins or price glitches from appearing as valid signals, a strict **Liquidity Floor** is enforced:
+- **Constraint**: `VOLUME_24H_IN_USD > 50,000`.
+- **Effect**: Any ticker with less than 50k USD in daily trading volume is excluded from the Movers and Losers lists.
+
+---
+
+## Database Architecture (`tradingview.db`)
+
+The project uses **SQLite** with **SQLModel** for local persistence.
+
+| Table | Purpose | Retention |
+| :--- | :--- | :--- |
+| **`ticker_index`** | A searchable list of all 5,800+ tickers from the Big Four. | Synced every 24 hours. |
+| **`favorites`** | Stores the symbols you have chosen to track. | Permanent until removed. |
+| **`market_data_history`** | Stores OHLCV and Indicators for your favorites across 11 intervals. | **6 months + 1 day** (rolling purge). |
 
 ---
 
 ## Full-Stack Development Lifecycle
 
-For a newcomer, understanding how a single "feature" (like adding a new data column) moves through the codebase is essential. Here is the typical lifecycle of a change in this project:
+To illustrate the development process, consider the implementation of the **Top Losers Tab**:
 
-### Step 1: The Data Definition (Database Layer)
-Everything starts with the "Shape" of the data. We define this in `backend/app/models.py`.
-- **Action**: You add a new field to the `MarketDataHistory` or `TickerIndex` class.
-- **Result**: When the app starts, `SQLModel` automatically updates the SQLite database structure to accommodate this new field.
-
-### Step 2: The Data Retrieval (Service Layer)
-Next, we need to fetch that data from the outside world. This happens in `backend/app/services/`.
-- **Action**: In `screener.py`, you map a new field from the TradingView API to our internal Python logic.
-- **Logic**: You decide how often this data should be fetched (e.g., every 5 seconds for live movers, or 5 minutes for historical persistence).
-
-### Step 3: The Data Delivery (API Layer)
-Now that the backend has the data, it needs to "serve" it to the frontend. This is done in `backend/app/main.py`.
-- **Action**: You update the API endpoints (URLs) so that when the frontend asks for data, the new field is included in the JSON response.
-- **WebSocket**: If it's a live update, you ensure the `broadcast_updates` function sends the new data through the "pipe" to all connected users.
-
-### Step 4: The Data Handling (Frontend State)
-The frontend receives the data and needs to store it in its memory. This is managed in `frontend/src/App.tsx`.
-- **Action**: You update the TypeScript `interfaces` (the "rules" for our data) to include the new field. 
-- **Effect**: React's `useState` and `useEffect` hooks detect the new data and trigger a "re-render" of the screen.
-
-### Step 5: The Visual Display (UI Layer)
-Finally, the user sees the change. This is usually in `frontend/src/components/CryptoTable.tsx`.
-- **Action**: You add a new `<th>` (header) and `<td>` (data cell) to the table.
-- **Result**: The data appears on your dashboard, color-coded and formatted for the user.
+1.  **Requirement**: Add a way to see the worst performers in the market.
+2.  **Backend Service (`screener.py`)**: Modified `get_top_movers` to accept a `sort_descending` parameter.
+3.  **API Layer (`main.py`)**: Added a `sort` query parameter to the `/top-movers` endpoint.
+4.  **Frontend State (`App.tsx`)**: Created `activeSort` state to toggle between `desc` (Gainers) and `asc` (Losers).
+5.  **Synchronization**: Implemented a `useEffect` hook to ensure that switching the tab triggers an immediate data refresh and adjusts the polling frequency.
+6.  **UI Component (`CryptoTable.tsx`)**: Added a `defaultSortDir` prop so the table knows whether to show the largest or smallest numbers at the top when the data arrives.
 
 ---
 
-## Technology Stack Deep-Dive (Newcomer Edition)
+## Technology Stack Justification (Technical Detail)
 
-| Category | Technology | Purpose | Newcomer Analogy |
-| :--- | :--- | :--- | :--- |
-| **Backend** | **FastAPI (Python)** | The "Brain" of the operation. Handles calculations and coordinates data. | Like a high-speed dispatch center. |
-| **Frontend** | **React (TypeScript)** | The "Face" of the operation. Handles everything the user sees and clicks. | Like a dynamic, self-updating Lego set. |
-| **Database** | **SQLite (SQLModel)** | The "Memory." Stores your favorites and history in a local file. | Like a very organized, digital filing cabinet. |
-| **Build Tool** | **Vite** | The "Workshop." Bundles the frontend code and runs the dev server. | Like a super-fast assembly line. |
-| **Styles** | **Tailwind CSS** | The "Paint." Controls the colors, spacing, and layout. | Like a set of standardized stickers you can slap onto any component. |
+- **FastAPI (Asynchronous Python)**: Chosen for its native support for `asyncio`, which is critical for handling WebSockets and background tasks (like the Indexer and Collector) without blocking the main API.
+- **SQLModel (SQLAlchemy + Pydantic)**: Provides a single source of truth for our data models. We define a class once, and it serves as both the Database Table and the JSON API Schema.
+- **React 19 (TypeScript)**: Uses strict typing to catch errors during development. The `useMemo` hook is used extensively in `CryptoTable.tsx` to handle sorting and filtering of 1,000+ rows efficiently without UI lag.
+- **Tailwind CSS (Utility-First)**: Enabled the rapid creation of the "Retro-Terminal" aesthetic using custom color configurations and "Breathing Light" animations.

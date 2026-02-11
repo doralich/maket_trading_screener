@@ -49,19 +49,19 @@ graph TD
     SSH -->|Starts| Frontend
 
     %% Fetching Logic
-    ScreenerSvc -->|Fetch Movers| TV
+    ScreenerSvc -->|Fetch Movers/Losers| TV
     CollectorSvc -->|Fetch History| TV
-    IndexerSvc -->|Fetch Tickers| TV
+    IndexerSvc -->|Fetch Full Catalog| TV
 
     %% Write to DB
     CollectorSvc -->|Persist History| DB
     IndexerSvc -->|Sync Index| DB
-    FavSvc -->|Manage Favs| DB
+    FavSvc -->|Manage Tickers| DB
 
     %% Read from DB (Return Paths)
     DB -->|Read Index| ScreenerSvc
-    DB -->|Load History| App
-    DB -->|Load Favs| FavSvc
+    DB -->|Load Favorite History| App
+    DB -->|Load Tracked List| FavSvc
 
     %% Internal Backend Routing
     App --> ScreenerSvc
@@ -70,8 +70,8 @@ graph TD
     App --> FavSvc
 
     %% App to Frontend
-    MainApp <-->|WebSocket: Real-time| App
-    MainApp <-->|REST: Search/Favs/Live| App
+    MainApp <-->|WebSocket: Real-time Movers| App
+    MainApp <-->|REST: Initial Data / Favorites / Losers| App
 
     MainApp --> Search
     MainApp --> Table
@@ -95,6 +95,14 @@ A high-precision, retro-terminal style cryptocurrency screener for the "Big Four
 
 ---
 
+## Technical Highlights
+- **Server-Side Sorting**: True "Top Movers" and "Top Losers" are calculated across the entire 5,800+ ticker catalog via API sort commands.
+- **Hybrid Communication**: Uses WebSockets for live gainer pushes and REST for high-precision history and loser polling.
+- **Data Retention**: Local SQLite database with a 6-month rolling purge policy for favorite indicators.
+- **Liquidity Guard**: Integrated 50,000 USD (24h) volume floor to filter out illiquid assets.
+
+---
+
 ## Setup & Installation
 
 ### 1. Prerequisites
@@ -114,28 +122,10 @@ Since the database is local and not stored in the repository, it will be automat
 
 To populate the search index with all ~5,800 tickers from the exchanges, the system runs a background sync automatically on startup. You can monitor the progress in `backend.log`.
 
-### 4. Manual Setup
-If you prefer to run the components separately:
+---
 
-**Backend:**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-pip install -r requirements.txt
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Configuration
-- **Liquidity Floor**: The screener defaults to a 50,000 USD (24h) volume floor to filter out illiquid assets.
-- **Refresh Rate**: Dashboard updates every 5 seconds.
+## Detailed Architecture
+For a deep dive into the service logic, database schema, and development lifecycle, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## License
 MIT
