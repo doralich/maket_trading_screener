@@ -46,21 +46,21 @@ graph TD
     end
 
     %% --- Logic Flow 1: Ticker Indexing ---
-    TV -->|Full Exchange Scans| IndexerSvc
-    IndexerSvc -->|1. Sync Index Table| DB
-    IndexerSvc -->|2. Prune Invalid Favs| DB
+    TV -.->|Full Exchange Scans| IndexerSvc
+    IndexerSvc ==>|1. Sync Index Table| DB
+    IndexerSvc ==>|2. Prune Invalid Favs| DB
 
     %% --- Logic Flow 2: Live Market Data ---
     W1 -->|Trigger| ScreenerSvc
-    ScreenerSvc -->|Fetch Movers/Losers| TV
+    ScreenerSvc -.->|Fetch Movers/Losers| TV
     ScreenerSvc -->|Push JSON| App
-    App <-->|WebSocket| MainApp
+    App <==>|WebSocket| MainApp
 
     %% --- Logic Flow 3: History Collection ---
     W2 -->|Trigger| CollectorSvc
-    DB -->|Read Tracked Symbols| CollectorSvc
-    CollectorSvc -->|Request Tech Snapshots| TV
-    CollectorSvc -->|Persist OHLCV + Indicators| DB
+    DB ---|1. Read Tracked Symbols| CollectorSvc
+    CollectorSvc -.->|2. Request Tech Snapshots| TV
+    CollectorSvc ==>|3. Persist OHLCV + Indicators| DB
 
     %% --- Logic Flow 4: User Interaction ---
     Search -->|REST Request| App
@@ -68,7 +68,7 @@ graph TD
     ScreenerSvc -->|SQL Query| DB
     
     MainApp -->|Manage Tracked Assets| FavSvc
-    FavSvc <-->|Read/Write| DB
+    FavSvc <==>|Read/Write| DB
 
     %% --- Component Relationships ---
     SSH -->|Spawn Process| Backend
@@ -83,6 +83,10 @@ graph TD
     style DB fill:#00ff41,stroke:#333,stroke-width:2px,color:#000
     style Backend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
+    
+    %% Explicitly separating lines
+    linkStyle 10 stroke:#00ff41,stroke-width:2px;
+    linkStyle 12 stroke:#00ff41,stroke-width:4px;
 ```
 
 A high-precision, retro-terminal style cryptocurrency screener for the "Big Four" exchanges: **Binance, Bybit, Bitget, and OKX**.
