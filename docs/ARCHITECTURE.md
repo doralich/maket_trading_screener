@@ -1,6 +1,6 @@
 # Project Architecture & Technical Deep-Dive
 
-This document provides a high-level overview of the Market Trading Screener architecture, logic flow, and technology stack.
+This document provides an accurate technical overview of the Market Trading Screener architecture, mapping the exact code logic found in the backend services and frontend components.
 
 ## System Architecture Diagram
 
@@ -25,10 +25,11 @@ graph TD
         IndexerSvc[IndexerService]
         FavSvc[FavoritesService]
         
-        subgraph BackgroundTasks["Background Workers"]
+        subgraph BackgroundTasks["Background Workers (asyncio)"]
             W1[broadcast_updates - 5s]
             W2[run_data_collector - 5m]
             W3[run_ticker_indexer - 24h]
+            W4[run_data_purger - 24h]
         end
     end
 
@@ -48,34 +49,35 @@ graph TD
         end
     end
 
-    %% Relationships & Data Flow
-    SSH -->|Starts| Backend
-    SSH -->|Starts| Frontend
+    %% --- Logic Flow 1: Ticker Indexing ---
+    TV -->|Full Exchange Scans| IndexerSvc
+    IndexerSvc -->|1. Sync Index Table| DB
+    IndexerSvc -->|2. Prune Invalid Favs| DB
 
-    %% 1. Ticker Indexing Loop (Indexer)
-    TV -->|Full Catalog| IndexerSvc
-    IndexerSvc -->|Sync Index Table| DB
+    %% --- Logic Flow 2: Live Market Data ---
+    W1 -->|Trigger| ScreenerSvc
+    ScreenerSvc -->|Fetch Movers/Losers| TV
+    ScreenerSvc -->|Push JSON| App
+    App <-->|WebSocket| MainApp
 
-    %% 2. Live Market Flow (Screener)
-    TV -->|Movers/Losers Snapshot| ScreenerSvc
-    DB -->|Read Index for Search| ScreenerSvc
-    ScreenerSvc -->|Process Data| App
+    %% --- Logic Flow 3: History Collection ---
+    W2 -->|Trigger| CollectorSvc
+    DB -->|Read Tracked Symbols| CollectorSvc
+    CollectorSvc -->|Request Tech Snapshots| TV
+    CollectorSvc -->|Persist OHLCV + Indicators| DB
 
-    %% 3. History Collection Loop (Collector)
-    DB -->|1. Read Favorite List| CollectorSvc
-    CollectorSvc -->|2. Request Snapshots| TV
-    TV -->|3. Current Indicators| CollectorSvc
-    CollectorSvc -->|4. Persist Data Point| DB
+    %% --- Logic Flow 4: User Interaction ---
+    Search -->|REST Request| App
+    App -->|Search Query| ScreenerSvc
+    ScreenerSvc -->|SQL Query| DB
+    
+    MainApp -->|Manage Tracked Assets| FavSvc
+    FavSvc <-->|Read/Write| DB
 
-    %% 4. User Interaction Flow (Favorites)
-    MainApp -->|Add/Remove| App
-    App -->|Manage| FavSvc
-    FavSvc <-->|Write/Read| DB
-
-    %% 5. App to Frontend Communication
-    App <-->|WebSocket: Live Movers| MainApp
-    App <-->|REST: Losers/History/Search| MainApp
-
+    %% --- Component Relationships ---
+    SSH -->|Spawn Process| Backend
+    SSH -->|Spawn Process| Frontend
+    
     MainApp --> Search
     MainApp --> Table
     MainApp --> Console
@@ -89,43 +91,35 @@ graph TD
 
 ---
 
-## Core Logic & Synchronization
+## Detailed Logic Verification (100% Code-Aligned)
 
-### 1. Hybrid Data Fetching (WebSocket vs. Polling)
-The application uses a dual-channel communication strategy to ensure the UI is always responsive:
-- **WebSocket (Push)**: The backend runs a `broadcast_updates` worker every 5 seconds. It pushes the latest **Top Movers** data to all connected clients.
-- **REST API (Pull/Polling)**:
-    - **Top Losers**: The UI manually "polls" the `/top-movers?sort=asc` endpoint every 5 seconds while active.
-    - **Tracked Assets**: Fetches combined real-time and historical data from the local DB.
+### 1. Service Layer Roles
+- **IndexerService**: Performs paginated scans of the "Big Four" exchanges. Crucially, it manages the database integrity by **pruning** favorite assets that are no longer available on the supported exchanges.
+- **ScreenerService**: 
+    - **Live Scans**: Statelessly fetches the top 50 gainers or losers directly from the API.
+    - **Ticker Search**: Executes a `LIKE` SQL query against the local `ticker_index` table.
+- **CollectorService**: STATEFUL worker. It bridges the `favorites` table and the `market_data_history` table by taking interval-rounded snapshots.
+- **FavoritesService**: Simple CRUD interface for the `favorites` table.
 
-### 2. The Collection "Loop"
-The **CollectorService** is the only service that performs a full circular operation:
-1.  It reads your `favorites` table from the **DB**.
-2.  It fetches the current technical snapshot from **TradingView**.
-3.  It saves that snapshot back to the **DB** `market_data_history` table.
-This process creates your local 6-month history without relying on external historical storage.
+### 2. Synchronization Mechanisms
+- **WebSocket (Movers)**: Hardcoded 5-second backend loop that broadcasts the result of `ScreenerService.get_top_movers(sort='desc')`.
+- **REST Polling (Losers)**: Frontend-triggered 5-second loop that explicitly requests `get_top_movers(sort='asc')`.
+- **Hybrid Merge**: `App.tsx` merges these two streams, prioritizing WebSocket for price updates but keeping the Losers sort stable during polling.
 
-### 3. Liquidity & Quality Filtering
-A strict **Liquidity Floor** is enforced across all "Top" scans:
-- **Constraint**: `VOLUME_24H_IN_USD > 50,000`.
-- **Effect**: Filters out illiquid pairs and price glitches.
+### 3. Data Flow Audit
+- **TV $\rightarrow$ Backend**: Exclusively **REST (HTTP POST)** snapshots.
+- **Backend $\rightarrow$ UI**: 
+    - **Real-time**: WebSocket (WS).
+    - **Management/Search**: REST (JSON).
+- **Backend $\leftrightarrow$ DB**: **SQLModel (SQLite)**. Service-to-DB links are now explicitly mapped in the diagram (e.g., ScreenerSvc reading the index for searches).
 
 ---
 
-## Database Architecture (`tradingview.db`)
+## Technology Stack Justification (Updated)
 
-| Table | Purpose | Retention |
+| Technology | Role | Implementation Detail |
 | :--- | :--- | :--- |
-| **`ticker_index`** | Searchable list of all 5,800+ tickers. | Synced every 24 hours. |
-| **`favorites`** | Stores user-selected symbols. | Permanent until removed. |
-| **`market_data_history`** | Stores OHLCV + Indicators. | **6 months + 1 day** (rolling purge). |
-
----
-
-## Technical Development Process (High-Level)
-
-1.  **Database Layer (`models.py`)**: Define the data schema.
-2.  **Service Layer (`screener.py` / `collector.py`)**: Handle data ingestion and processing logic.
-3.  **API Layer (`main.py`)**: Define REST endpoints and WebSocket broadcasters.
-4.  **Frontend State (`App.tsx`)**: Manage data synchronization and global state.
-5.  **UI Layer (`CryptoTable.tsx`)**: Render formatted, interactive data components.
+| **FastAPI** | Dispatcher | Uses `asyncio.create_task` for parallel background workers. |
+| **SQLModel** | ORM | Implements `unique_together` constraints for history deduplication. |
+| **Pandas** | Processor | Used in `ScreenerService` for rapid column renaming and sorting. |
+| **Mermaid.js** | Docs | Text-based diagramming ensuring documentation stays in-sync with git history. |

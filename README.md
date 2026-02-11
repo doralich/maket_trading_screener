@@ -21,10 +21,11 @@ graph TD
         IndexerSvc[IndexerService]
         FavSvc[FavoritesService]
         
-        subgraph BackgroundTasks["Background Workers"]
+        subgraph BackgroundTasks["Background Workers (asyncio)"]
             W1[broadcast_updates - 5s]
             W2[run_data_collector - 5m]
             W3[run_ticker_indexer - 24h]
+            W4[run_data_purger - 24h]
         end
     end
 
@@ -44,34 +45,35 @@ graph TD
         end
     end
 
-    %% Relationships & Data Flow
-    SSH -->|Starts| Backend
-    SSH -->|Starts| Frontend
+    %% --- Logic Flow 1: Ticker Indexing ---
+    TV -->|Full Exchange Scans| IndexerSvc
+    IndexerSvc -->|1. Sync Index Table| DB
+    IndexerSvc -->|2. Prune Invalid Favs| DB
 
-    %% 1. Ticker Indexing Loop (Indexer)
-    TV -->|Full Catalog| IndexerSvc
-    IndexerSvc -->|Sync Index Table| DB
+    %% --- Logic Flow 2: Live Market Data ---
+    W1 -->|Trigger| ScreenerSvc
+    ScreenerSvc -->|Fetch Movers/Losers| TV
+    ScreenerSvc -->|Push JSON| App
+    App <-->|WebSocket| MainApp
 
-    %% 2. Live Market Flow (Screener)
-    TV -->|Movers/Losers Snapshot| ScreenerSvc
-    DB -->|Read Index for Search| ScreenerSvc
-    ScreenerSvc -->|Process Data| App
+    %% --- Logic Flow 3: History Collection ---
+    W2 -->|Trigger| CollectorSvc
+    DB -->|Read Tracked Symbols| CollectorSvc
+    CollectorSvc -->|Request Tech Snapshots| TV
+    CollectorSvc -->|Persist OHLCV + Indicators| DB
 
-    %% 3. History Collection Loop (Collector)
-    DB -->|1. Read Favorite List| CollectorSvc
-    CollectorSvc -->|2. Request Snapshots| TV
-    TV -->|3. Current Indicators| CollectorSvc
-    CollectorSvc -->|4. Persist Data Point| DB
+    %% --- Logic Flow 4: User Interaction ---
+    Search -->|REST Request| App
+    App -->|Search Query| ScreenerSvc
+    ScreenerSvc -->|SQL Query| DB
+    
+    MainApp -->|Manage Tracked Assets| FavSvc
+    FavSvc <-->|Read/Write| DB
 
-    %% 4. User Interaction Flow (Favorites)
-    MainApp -->|Add/Remove| App
-    App -->|Manage| FavSvc
-    FavSvc <-->|Write/Read| DB
-
-    %% 5. App to Frontend Communication
-    App <-->|WebSocket: Live Movers| MainApp
-    App <-->|REST: Losers/History/Search| MainApp
-
+    %% --- Component Relationships ---
+    SSH -->|Spawn Process| Backend
+    SSH -->|Spawn Process| Frontend
+    
     MainApp --> Search
     MainApp --> Table
     MainApp --> Console
