@@ -1,6 +1,6 @@
 # Project Architecture & Technical Deep-Dive
 
-This document provides a comprehensive technical overview of the Market Trading Screener. It details the system's architecture, data synchronization logic, and the full-stack development process.
+This document provides a high-level overview of the Market Trading Screener architecture, logic flow, and technology stack.
 
 ## System Architecture Diagram
 
@@ -52,30 +52,29 @@ graph TD
     SSH -->|Starts| Backend
     SSH -->|Starts| Frontend
 
-    %% Fetching Logic
-    ScreenerSvc -->|Fetch Movers/Losers| TV
-    CollectorSvc -->|Fetch History| TV
-    IndexerSvc -->|Fetch Full Catalog| TV
+    %% 1. Ticker Indexing Loop (Indexer)
+    TV -->|Full Catalog| IndexerSvc
+    IndexerSvc -->|Sync Index Table| DB
 
-    %% Write to DB
-    CollectorSvc -->|Persist History| DB
-    IndexerSvc -->|Sync Index| DB
-    FavSvc -->|Manage Tickers| DB
+    %% 2. Live Market Flow (Screener)
+    TV -->|Movers/Losers Snapshot| ScreenerSvc
+    DB -->|Read Index for Search| ScreenerSvc
+    ScreenerSvc -->|Process Data| App
 
-    %% Read from DB (Return Paths)
-    DB -->|Read Index| ScreenerSvc
-    DB -->|Load Favorite History| App
-    DB -->|Load Tracked List| FavSvc
+    %% 3. History Collection Loop (Collector)
+    DB -->|1. Read Favorite List| CollectorSvc
+    CollectorSvc -->|2. Request Snapshots| TV
+    TV -->|3. Current Indicators| CollectorSvc
+    CollectorSvc -->|4. Persist Data Point| DB
 
-    %% Internal Backend Routing
-    App --> ScreenerSvc
-    App --> CollectorSvc
-    App --> IndexerSvc
-    App --> FavSvc
+    %% 4. User Interaction Flow (Favorites)
+    MainApp -->|Add/Remove| App
+    App -->|Manage| FavSvc
+    FavSvc <-->|Write/Read| DB
 
-    %% App to Frontend
-    MainApp <-->|WebSocket: Real-time Movers| App
-    MainApp <-->|REST: Initial Data / Favorites / Losers| App
+    %% 5. App to Frontend Communication
+    App <-->|WebSocket: Live Movers| MainApp
+    App <-->|REST: Losers/History/Search| MainApp
 
     MainApp --> Search
     MainApp --> Table
@@ -94,52 +93,39 @@ graph TD
 
 ### 1. Hybrid Data Fetching (WebSocket vs. Polling)
 The application uses a dual-channel communication strategy to ensure the UI is always responsive:
-- **WebSocket (Push)**: The backend runs a `broadcast_updates` worker every 5 seconds. It pushes the latest **Top Movers** data to all connected clients. This is the primary channel for real-time price action.
+- **WebSocket (Push)**: The backend runs a `broadcast_updates` worker every 5 seconds. It pushes the latest **Top Movers** data to all connected clients.
 - **REST API (Pull/Polling)**:
-    - **Initial Load**: When the app starts, it performs a REST fetch for the first snapshot.
-    - **Top Losers**: Since the WebSocket broadcast is optimized for gainers, the **Top Losers** tab uses a 5-second interval poller to fetch data from the `/api/v1/screener/top-movers?sort=asc` endpoint.
-    - **Favorites**: The **Tracked Assets** table fetches data via REST to allow for complex interval-switching (e.g., viewing 1H data while the main movers are on 5M).
+    - **Top Losers**: The UI manually "polls" the `/top-movers?sort=asc` endpoint every 5 seconds while active.
+    - **Tracked Assets**: Fetches combined real-time and historical data from the local DB.
 
-### 2. Market-Wide Sorting (Server-Side)
-Unlike basic screeners that sort a pre-loaded list, this system performs **Server-Side Sorting**:
-- When you request "Top Losers," the backend sends a sort command to TradingView's servers: `cs.sort_by("change|X", ascending=True)`.
-- This ensures the results are drawn from the **entire ~5,800+ ticker catalog**, not just the coins currently visible on your screen.
+### 2. The Collection "Loop"
+The **CollectorService** is the only service that performs a full circular operation:
+1.  It reads your `favorites` table from the **DB**.
+2.  It fetches the current technical snapshot from **TradingView**.
+3.  It saves that snapshot back to the **DB** `market_data_history` table.
+This process creates your local 6-month history without relying on external historical storage.
 
 ### 3. Liquidity & Quality Filtering
-To prevent "Flash Crashes" on dead coins or price glitches from appearing as valid signals, a strict **Liquidity Floor** is enforced:
+A strict **Liquidity Floor** is enforced across all "Top" scans:
 - **Constraint**: `VOLUME_24H_IN_USD > 50,000`.
-- **Effect**: Any ticker with less than 50k USD in daily trading volume is excluded from the Movers and Losers lists.
+- **Effect**: Filters out illiquid pairs and price glitches.
 
 ---
 
 ## Database Architecture (`tradingview.db`)
 
-The project uses **SQLite** with **SQLModel** for local persistence.
-
 | Table | Purpose | Retention |
 | :--- | :--- | :--- |
-| **`ticker_index`** | A searchable list of all 5,800+ tickers from the Big Four. | Synced every 24 hours. |
-| **`favorites`** | Stores the symbols you have chosen to track. | Permanent until removed. |
-| **`market_data_history`** | Stores OHLCV and Indicators for your favorites across 11 intervals. | **6 months + 1 day** (rolling purge). |
+| **`ticker_index`** | Searchable list of all 5,800+ tickers. | Synced every 24 hours. |
+| **`favorites`** | Stores user-selected symbols. | Permanent until removed. |
+| **`market_data_history`** | Stores OHLCV + Indicators. | **6 months + 1 day** (rolling purge). |
 
 ---
 
-## Full-Stack Development Lifecycle
+## Technical Development Process (High-Level)
 
-To illustrate the development process, consider the implementation of the **Top Losers Tab**:
-
-1.  **Requirement**: Add a way to see the worst performers in the market.
-2.  **Backend Service (`screener.py`)**: Modified `get_top_movers` to accept a `sort_descending` parameter.
-3.  **API Layer (`main.py`)**: Added a `sort` query parameter to the `/top-movers` endpoint.
-4.  **Frontend State (`App.tsx`)**: Created `activeSort` state to toggle between `desc` (Gainers) and `asc` (Losers).
-5.  **Synchronization**: Implemented a `useEffect` hook to ensure that switching the tab triggers an immediate data refresh and adjusts the polling frequency.
-6.  **UI Component (`CryptoTable.tsx`)**: Added a `defaultSortDir` prop so the table knows whether to show the largest or smallest numbers at the top when the data arrives.
-
----
-
-## Technology Stack Justification (Technical Detail)
-
-- **FastAPI (Asynchronous Python)**: Chosen for its native support for `asyncio`, which is critical for handling WebSockets and background tasks (like the Indexer and Collector) without blocking the main API.
-- **SQLModel (SQLAlchemy + Pydantic)**: Provides a single source of truth for our data models. We define a class once, and it serves as both the Database Table and the JSON API Schema.
-- **React 19 (TypeScript)**: Uses strict typing to catch errors during development. The `useMemo` hook is used extensively in `CryptoTable.tsx` to handle sorting and filtering of 1,000+ rows efficiently without UI lag.
-- **Tailwind CSS (Utility-First)**: Enabled the rapid creation of the "Retro-Terminal" aesthetic using custom color configurations and "Breathing Light" animations.
+1.  **Database Layer (`models.py`)**: Define the data schema.
+2.  **Service Layer (`screener.py` / `collector.py`)**: Handle data ingestion and processing logic.
+3.  **API Layer (`main.py`)**: Define REST endpoints and WebSocket broadcasters.
+4.  **Frontend State (`App.tsx`)**: Manage data synchronization and global state.
+5.  **UI Layer (`CryptoTable.tsx`)**: Render formatted, interactive data components.
