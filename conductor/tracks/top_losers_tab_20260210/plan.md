@@ -4,7 +4,7 @@
 - [x] Task: Enhance ScreenerService for Top Losers [876d3a9]
     - [ ] Write unit tests for `get_top_movers` with 'bottom' sort option
     - [ ] Update `ScreenerService.get_top_movers` to support an `ascending` parameter for "Change %" sorting
-- [ ] Task: API Endpoint Update
+- [x] Task: API Endpoint Update [0ff8cb5]
     - [ ] Write integration tests for `GET /api/v1/screener/top-movers` with the new sort parameter
     - [ ] Update the FastAPI route to accept a `sort` or `direction` query parameter (defaulting to 'desc')
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Backend - Data Retrieval & API' (Protocol in workflow.md)
