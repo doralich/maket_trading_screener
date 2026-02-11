@@ -1,6 +1,88 @@
 # Market Trading Screener
 
-![Project Architecture](docs/img/architecture.png)
+```mermaid
+graph TD
+    %% External Layer
+    subgraph External["External APIs"]
+        TV[TradingView Screener API]
+    end
+
+    %% DevOps/Orchestration
+    subgraph DevOps["Orchestration"]
+        SSH[start.sh]
+    end
+
+    %% Backend Layer
+    subgraph Backend["Backend (FastAPI + Python)"]
+        direction TB
+        App[main.py]
+        ScreenerSvc[ScreenerService]
+        CollectorSvc[CollectorService]
+        IndexerSvc[IndexerService]
+        FavSvc[FavoritesService]
+        
+        subgraph BackgroundTasks["Background Workers"]
+            W1[broadcast_updates - 5s]
+            W2[run_data_collector - 5m]
+            W3[run_ticker_indexer - 24h]
+        end
+    end
+
+    %% Persistence Layer
+    subgraph Storage["Persistence (SQLite)"]
+        DB[(tradingview.db)]
+    end
+
+    %% Frontend Layer
+    subgraph Frontend["Frontend (React + Vite)"]
+        direction TB
+        MainApp[App.tsx]
+        subgraph Components["UI Components"]
+            Search[UniversalSearch]
+            Table[CryptoTable]
+            Console[SystemConsole]
+        end
+    end
+
+    %% Relationships & Data Flow
+    SSH -->|Starts| Backend
+    SSH -->|Starts| Frontend
+
+    %% Fetching Logic
+    ScreenerSvc -->|Fetch Movers| TV
+    CollectorSvc -->|Fetch History| TV
+    IndexerSvc -->|Fetch Tickers| TV
+
+    %% Write to DB
+    CollectorSvc -->|Persist History| DB
+    IndexerSvc -->|Sync Index| DB
+    FavSvc -->|Manage Favs| DB
+
+    %% Read from DB (Return Paths)
+    DB -->|Read Index| ScreenerSvc
+    DB -->|Load History| App
+    DB -->|Load Favs| FavSvc
+
+    %% Internal Backend Routing
+    App --> ScreenerSvc
+    App --> CollectorSvc
+    App --> IndexerSvc
+    App --> FavSvc
+
+    %% App to Frontend
+    MainApp <-->|WebSocket: Real-time| App
+    MainApp <-->|REST: Search/Favs/Live| App
+
+    MainApp --> Search
+    MainApp --> Table
+    MainApp --> Console
+
+    %% Styling
+    style TV fill:#f9f,stroke:#333,stroke-width:2px
+    style DB fill:#00ff41,stroke:#333,stroke-width:2px,color:#000
+    style Backend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
+    style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
+```
 
 A high-precision, retro-terminal style cryptocurrency screener for the "Big Four" exchanges: **Binance, Bybit, Bitget, and OKX**.
 
