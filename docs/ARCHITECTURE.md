@@ -96,22 +96,43 @@ graph TD
 
 ---
 
-## Technical Development Process (High-Level)
+## Full-Stack Development Lifecycle
 
-As a newcomer to software engineering, it is helpful to visualize how a single code change moves through the system. For example, if we were to add a **"Market Sentiment"** indicator:
+For a newcomer, understanding how a single "feature" (like adding a new data column) moves through the codebase is essential. Here is the typical lifecycle of a change in this project:
 
-1.  **Database Layer (`models.py`)**: Define the new data field in the `MarketDataHistory` model.
-2.  **Service Layer (`screener.py`)**: Map the new TradingView API field to our internal logic.
-3.  **API Layer (`main.py`)**: Update the endpoint responses to include the new field.
-4.  **Frontend State (`App.tsx`)**: Update the React state interfaces to handle the new data.
-5.  **UI Layer (`CryptoTable.tsx`)**: Add a new column to the table to display the sentiment to the user.
+### Step 1: The Data Definition (Database Layer)
+Everything starts with the "Shape" of the data. We define this in `backend/app/models.py`.
+- **Action**: You add a new field to the `MarketDataHistory` or `TickerIndex` class.
+- **Result**: When the app starts, `SQLModel` automatically updates the SQLite database structure to accommodate this new field.
 
-## Technology Stack Justification
+### Step 2: The Data Retrieval (Service Layer)
+Next, we need to fetch that data from the outside world. This happens in `backend/app/services/`.
+- **Action**: In `screener.py`, you map a new field from the TradingView API to our internal Python logic.
+- **Logic**: You decide how often this data should be fetched (e.g., every 5 seconds for live movers, or 5 minutes for historical persistence).
 
-| Technology | Role | Why we use it |
-| :--- | :--- | :--- |
-| **FastAPI** | Backend Framework | Extremely fast, supports asynchronous tasks (WebSockets) out of the box. |
-| **SQLModel** | Database ORM | Combines SQLAlchemy and Pydantic for type-safe database interactions. |
-| **React** | Frontend Framework | Component-based structure makes it easy to build complex, interactive dashboards. |
-| **Vite** | Frontend Tooling | Provides an instant development environment and lightning-fast build times. |
-| **Tailwind CSS** | Styling | Allows for rapid UI development using utility classes directly in the components. |
+### Step 3: The Data Delivery (API Layer)
+Now that the backend has the data, it needs to "serve" it to the frontend. This is done in `backend/app/main.py`.
+- **Action**: You update the API endpoints (URLs) so that when the frontend asks for data, the new field is included in the JSON response.
+- **WebSocket**: If it's a live update, you ensure the `broadcast_updates` function sends the new data through the "pipe" to all connected users.
+
+### Step 4: The Data Handling (Frontend State)
+The frontend receives the data and needs to store it in its memory. This is managed in `frontend/src/App.tsx`.
+- **Action**: You update the TypeScript `interfaces` (the "rules" for our data) to include the new field. 
+- **Effect**: React's `useState` and `useEffect` hooks detect the new data and trigger a "re-render" of the screen.
+
+### Step 5: The Visual Display (UI Layer)
+Finally, the user sees the change. This is usually in `frontend/src/components/CryptoTable.tsx`.
+- **Action**: You add a new `<th>` (header) and `<td>` (data cell) to the table.
+- **Result**: The data appears on your dashboard, color-coded and formatted for the user.
+
+---
+
+## Technology Stack Deep-Dive (Newcomer Edition)
+
+| Category | Technology | Purpose | Newcomer Analogy |
+| :--- | :--- | :--- | :--- |
+| **Backend** | **FastAPI (Python)** | The "Brain" of the operation. Handles calculations and coordinates data. | Like a high-speed dispatch center. |
+| **Frontend** | **React (TypeScript)** | The "Face" of the operation. Handles everything the user sees and clicks. | Like a dynamic, self-updating Lego set. |
+| **Database** | **SQLite (SQLModel)** | The "Memory." Stores your favorites and history in a local file. | Like a very organized, digital filing cabinet. |
+| **Build Tool** | **Vite** | The "Workshop." Bundles the frontend code and runs the dev server. | Like a super-fast assembly line. |
+| **Styles** | **Tailwind CSS** | The "Paint." Controls the colors, spacing, and layout. | Like a set of standardized stickers you can slap onto any component. |
