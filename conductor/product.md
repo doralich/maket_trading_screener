@@ -23,4 +23,17 @@ I want to build a local browser based app based on the link: https://github.com/
 - **Customization:** Allow users to save their own custom indicators, presets, and query configurations locally for a personalized trading setup.
 
 ### Priority Asset Classes
-- **Cryptocurrencies:** Focus on high-liquidity assets (Top 1500 by Market Cap) from major Centralized Exchanges (CEX): **Binance, Bybit, and Bitget**. Support includes both Spot and Perpetual contracts.
+- **Cryptocurrencies:** Focus on all available assets from the "Big Four" Centralized Exchanges (CEX): **Binance, Bybit, Bitget, and OKX**. 
+- **Indexing Strategy:** Instead of limiting to global Market Cap, the system performs a full index of all tickers on supported exchanges (currently ~5,800+ pairs).
+- **Contract Support:** Full support for both Spot and USDT Perpetual contracts (.P counterparts).
+
+### Specialized Tools
+- **PERSISTED_ASSETS_DETAIL:** A dedicated tracking system for "Favorite" assets that persists 6 months of historical data locally across multiple timeframes.
+- **Embedded Indicator Documentation:** Interactive terminal-style "Help Notes" providing technical definitions for MACD and SMA directly within the data tables.
+- **Real-time RSI Divergence Logic:** A hybrid engine capable of identifying bullish/bearish divergences using both instant API checks and sophisticated 50-candle pivot analysis.
+- **Market-Wide Top Movers & Losers:** A dual-tabbed real-time scanner that identifies the absolute top 50 gainers and bottom 50 losers from the entire ~5,800+ ticker catalog.
+
+### Technical Implementation Details
+- **True Market Sorting:** To identify genuine losers, sorting is performed server-side (TradingView API) rather than locally. This ensures the results are drawn from the full market universe rather than just the currently loaded subset.
+- **Liquidity Protection:** A global 50,000 USD (24h) volume floor is applied to all "Top" queries to filter out illiquid pairs and price glitches, ensuring only active, tradable assets are displayed.
+- **Interval Mapping:** Uses precise `change|X` API fields for rolling intraday performance tracking (1m, 5m, 15m, 1h, 4h) to maintain consistency with standard technical analysis candles.

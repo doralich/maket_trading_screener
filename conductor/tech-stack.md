@@ -27,3 +27,8 @@
 ## Integrated Analysis Environment
 - **Implementation:** **Xterm.js with Backend Shell**
     - Why: Connects the frontend terminal emulator to a persistent Python shell session on the FastAPI backend, reinforcing the retro-future utilitarian aesthetic.
+
+## Data & API Constraints
+- **Supported Exchanges:** BINANCE, BYBIT, BITGET, OKX.
+- **Asset Scope:** Full exchange indexing (~5,825 pairs).
+- **Liquidity Filter:** Minimum 50,000 USD 24h Volume required for inclusion in Top Mover/Loser scans.
