@@ -1,108 +1,134 @@
-# Project Architecture & Technical Deep-Dive
+# Project Architecture & Logic Deep-Dive
 
-This document provides a 100% code-accurate overview of the Market Trading Screener architecture.
+This document provides the definitive technical specification of the Market Trading Screener. It maps the implementation details of the Python/FastAPI backend and React frontend into a coherent system model.
 
-## System Architecture Diagram
+## 1. System Architecture Diagram
 
 ```mermaid
 graph TD
-    %% External Layer
-    subgraph External["External APIs"]
-        TV[TradingView Screener API]
+    %% EXTERNAL DATA SOURCE
+    subgraph External["[EXTERNAL] TradingView Infrastructure"]
+        TV_API[Screener API - REST/POST]
     end
 
-    %% Backend Layer
-    subgraph Backend["Backend (FastAPI + Python)"]
+    %% BACKEND CORE
+    subgraph Backend["[BACKEND] FastAPI Engine"]
         direction TB
-        App[main.py]
-        ScreenerSvc[ScreenerService]
-        CollectorSvc[CollectorService]
-        IndexerSvc[IndexerService]
-        FavSvc[FavoritesService]
+        Main[main.py - API Gateway]
         
-        subgraph Workers["Background Workers"]
-            W1[broadcast_updates]
-            W2[run_data_collector]
-            W3[run_ticker_indexer]
-            W4[run_data_purger]
+        subgraph Services["Service Layer"]
+            S_Screen[ScreenerService]
+            S_Coll[CollectorService]
+            S_Idx[IndexerService]
+            S_Fav[FavoritesService]
+        end
+
+        subgraph Workers["Async Background Workers"]
+            W_Broad[broadcast_updates - 5s]
+            W_Coll[run_data_collector - 5m]
+            W_Idx[run_ticker_indexer - 24h]
+            W_Purge[run_data_purger - 24h]
         end
     end
 
-    %% Persistence Layer
-    subgraph Storage["Persistence (SQLite)"]
-        DB[(tradingview.db)]
+    %% PERSISTENCE
+    subgraph Storage["[STORAGE] Local Persistence"]
+        DB[(tradingview.db - SQLite)]
     end
 
-    %% Frontend Layer
-    subgraph Frontend["Frontend (React + Vite)"]
-        MainApp[App.tsx]
-        Search[UniversalSearch]
-        Table[CryptoTable]
+    %% FRONTEND CORE
+    subgraph Frontend["[FRONTEND] React Dashboard"]
+        MainApp[App.tsx - State Manager]
+        subgraph UI["UI Components"]
+            Search[UniversalSearch.tsx]
+            Table[CryptoTable.tsx]
+            Console[SystemConsole.tsx]
+        end
     end
 
-    %% --- 1. TICKER INDEXING (IndexerService) ---
-    TV -.->|Full Scan| IndexerSvc
-    IndexerSvc ==>|1. Sync Index| DB
-    IndexerSvc ==>|2. Prune Stale Favs| DB
+    %% --- DATA FLOW 1: DISCOVERY (Indexing) ---
+    TV_API -.->|1. Fetch Full Catalog| S_Idx
+    S_Idx ==>|2. Sync Ticker Table| DB
+    S_Idx ==>|3. Prune Invalid Tracked| DB
 
-    %% --- 2. LIVE MARKET DATA (ScreenerService) ---
-    W1 -->|Trigger every 5s| ScreenerSvc
-    ScreenerSvc -.->|Fetch Snapshot| TV
-    ScreenerSvc -->|JSON Data| App
-    App <==>|WebSocket| MainApp
+    %% --- DATA FLOW 2: LIVE MARKET (Streaming) ---
+    W_Broad -->|Trigger| S_Screen
+    S_Screen -.->|4. Snapshot Request| TV_API
+    S_Screen -->|5. JSON Mover Data| Main
+    Main <==>|6. WebSocket Push| MainApp
 
-    %% --- 3. HISTORY COLLECTION (CollectorService) ---
-    W2 -->|Trigger every 5m| CollectorSvc
-    DB ==>|Step A: Read Fav List| CollectorSvc
-    CollectorSvc -.->|Step B: Request Techs| TV
-    CollectorSvc ==>|Step C: Persist Data| DB
+    %% --- DATA FLOW 3: HISTORY (Collection) ---
+    W_Coll -->|Trigger| S_Coll
+    DB ==>|7. Read Favorites| S_Coll
+    S_Coll -.->|8. Technical Snapshot| TV_API
+    S_Coll ==>|9. Append History Row| DB
 
-    %% --- 4. USER ACTIONS (Favorites & Search) ---
-    Search -->|REST Request| App
-    App -->|Invoke search_ticker| ScreenerSvc
-    ScreenerSvc ==>|SQL Query| DB
+    %% --- DATA FLOW 4: INTERACTION (Search & Track) ---
+    Search -->|REST Request| Main
+    Main -->|Local Lookup| S_Screen
+    S_Screen ==>|10. SQL LIKE Query| DB
     
-    MainApp -->|Toggle Favorite| FavSvc
-    FavSvc ==>|CRUD Ops| DB
+    MainApp -->|Toggle Track| S_Fav
+    S_Fav ==>|11. CRUD Ops| DB
 
-    %% Styling
-    style TV fill:#f9f,stroke:#333,stroke-width:2px
+    %% --- LAYOUT CONNECTIONS ---
+    MainApp --> Search
+    MainApp --> Table
+    MainApp --> Console
+
+    %% --- STYLING ---
+    style TV_API fill:#f9f,stroke:#333,stroke-width:2px
     style DB fill:#00ff41,stroke:#333,stroke-width:2px,color:#000
     style Backend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
-    
-    %% Color Code: Green (==>) for Database, Dotted (-.->) for Internet
-    %% Indices: 0:TV->Idx, 1:Idx->DB, 2:Idx->DB, 3:W1->Scr, 4:Scr->TV, 5:Scr->App, 6:App->Main, 7:W2->Coll, 8:DB->Coll, 9:Coll->TV, 10:Coll->DB, 11:Search->App, 12:App->Scr, 13:Scr->DB, 14:Main->Fav, 15:Fav->DB
-    linkStyle 1,2,8,10,13,15 stroke:#00ff41,stroke-width:3px;
-    linkStyle 0,4,9 stroke:#f9f,stroke-width:2px,stroke-dasharray: 5 5;
+    style External fill:#000,stroke:#f9f,stroke-dasharray: 5 5
 ```
 
 ---
 
-## Code-Logic Mapping (Audit Results)
+## 2. Comprehensive Workflow Cycle
 
-### 1. The Persistence Layer (SQLite)
-The **Green Arrows (`==>`)** in the diagram represent every point where the code interacts with `tradingview.db`. 
-*   **IndexerService**: Writes the full ticker list and **deletes** favorites if they are delisted from exchanges.
-*   **CollectorService**: Performs a "Read-then-Write" cycle. It reads the user's favorites, fetches live data, and writes a new row to the history table.
-*   **ScreenerService**: Performs a **Read-only** query during searches to find coins in the local index.
+### Phase A: Bootstrapping (start.sh)
+1.  **Environment Isolation**: Checks for/creates a Python `venv` and installs `backend/requirements.txt`.
+2.  **Dependency Resolution**: Ensures `frontend/node_modules` are installed.
+3.  **Process Management**: Launches the FastAPI server (Port 8000) and Vite Dev Server (Port 5173) in parallel.
+4.  **Database Ignition**: `init_db()` triggers `SQLModel`, creating the local SQLite file if missing.
 
-### 2. The Communication Layer
-*   **External (`-.->`)**: Represents the REST API snapshots pulled from TradingView. This is "Outbound" traffic.
-*   **Internal WebSocket (`<==>`)**: The bi-directional pipe between your Backend and Browser. It only pushes the "Movers" data to keep the dashboard fast.
-*   **Internal REST**: Standard "Question and Answer" requests for things like searching a coin or viewing "Top Losers."
+### Phase B: Background Synchronization
+1.  **The Indexer (W3)**: Scans every available ticker on the Big Four (Binance, Bybit, Bitget, OKX). It builds a local index so the user doesn't have to wait for network latency during searches.
+2.  **The Collector (W2)**: Every 5 minutes, it "stamps" the current price and indicators (RSI, MACD, SMA) for all tracked assets into the database.
+3.  **The Purger (W4)**: Every 24 hours, it scans the database and deletes any record older than 181 days, keeping the local file size efficient.
 
-### 3. Service Definitions
-*   **IndexerService**: The "Librarian." Keeps the database index of 5,800+ coins fresh.
-*   **CollectorService**: The "Time Machine." Saves snapshots every 5 minutes to build your 6-month local history.
-*   **ScreenerService**: The "Navigator." Filters the whole market to find winners and losers in real-time.
-*   **FavoritesService**: The "Manager." Simply handles adding or removing coins from your tracking list.
+### Phase C: Data Ingestion & Delivery
+1.  **The Live Scan**: The `ScreenerService` performs server-side sorting at TradingView to find the "True" top performers from the entire ~5,800+ asset catalog.
+2.  **The Hybrid Bridge**:
+    *   **Gainers**: Pushed automatically via **WebSocket** every 5 seconds.
+    *   **Losers**: Pulled via **REST API** every 5 seconds (triggered by tab selection).
+    *   **Favorites**: Pulled via REST to allow the user to change timeframes (e.g., viewing 1H history while the main market is on 5M) independently.
 
 ---
 
-## Newcomer Development Workflow
-To add a new feature (e.g., a "Volume Alert"):
-1.  **Database**: Add an `alert_threshold` column to the `Favorite` model.
-2.  **Service**: Update `ScreenerService` to check if current volume exceeds that threshold.
-3.  **API**: Send an `alert` flag through the WebSocket.
-4.  **UI**: Make the row in `CryptoTable` flash or glow when the flag is true.
+## 3. Detailed Dataflow Architecture
+
+### 1. Ingestion Protocol
+The system uses **stateless REST snapshots** from the external API. This is by design to bypass the limitations of public WebSockets, allowing the system to monitor thousands of coins simultaneously without managing thousands of open connections.
+
+### 2. Processing Logic
+- **Precision Management**: The backend enforces 8 decimal places for price and 6 for technical indicators.
+- **Liquidity Floor**: A global filter `VOLUME_24H_IN_USD > 50,000` is applied to all market-wide scans to ensure reliability.
+- **Interval Mapping**: The system maps frontend requests (e.g., "15M") to specific API change fields (`change|15`) to ensure the percentage values match the specific timeframe candles.
+
+### 3. User State Loop
+When a user "Tracks" an asset:
+1.  **UI Event**: `MainApp` sends a POST request to `/api/v1/favorites`.
+2.  **DB Entry**: `FavoritesService` adds the symbol to the `favorites` table.
+3.  **Automated Tracking**: The next time `CollectorService` (W2) runs, it automatically includes this new symbol in its 5-minute data-persistence loop.
+
+---
+
+## 4. Technical Stack Breakdown
+
+- **FastAPI**: Used as the asynchronous orchestrator. It manages the lifecycle of the four background workers using `asyncio.create_task`.
+- **SQLModel**: Serves as the single source of truth for data shapes. The models in `app/models.py` define both the database schema and the API response structures.
+- **React 19 + Vite**: Chosen for high-performance rendering. The `CryptoTable` uses memoized filtering logic to handle the 5-second data bursts without UI stuttering.
+- **Tailwind CSS**: Implements the high-precision "Retro-Terminal" UI, including custom animations like `animate-breathing` for system status.
