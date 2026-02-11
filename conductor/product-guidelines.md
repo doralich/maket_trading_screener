@@ -18,5 +18,16 @@
 
 ## Design Principles
 - **Function Over Form:** Every UI element must serve a clear purpose in the screening or analysis workflow.
+- **Numeric Precision:** 
+    - **Price:** Render up to 8 decimal places to handle low-value assets (SATS/BTC pairs).
+    - **MACD/Indicators:** Render with 6 decimal places to avoid misleading "0.00" values on technical levels.
+    - **Percentages:** Standard 2 decimal places with "+" sign prefix for gains.
+- **Micro-Animations:** 
+    - Use "Breathing Light" effects (opacity + glow pulsing) for persistent status indicators (e.g., System Load).
+    - Use standard pulse animations for active connectivity status.
+- **Help Documentation:**
+    - Contextual help must be accessible via `(?)` buttons next to headers.
+    - Help Notes should appear as floating system windows with semi-transparent backgrounds (`#1a1a1a/90`) and `backdrop-blur` for a modern terminal look.
+    - Notes should be styled with terminal green text (`#00ff41`) and sharp borders to maintain aesthetic consistency.
 - **Responsiveness:** Ensure the terminal-style UI feels fast and "lag-free," even when handling large data tables or frequent updates.
 - **Personalization:** Save user preferences for data density, visible columns, and layout configurations locally to ensure a consistent experience across sessions.

@@ -21,6 +21,16 @@ class FavoritesService:
             session.add(favorite)
             session.commit()
             session.refresh(favorite)
+            
+            # Trigger immediate data collection for all intervals
+            try:
+                from app.services.collector import CollectorService
+                collector = CollectorService()
+                # Run sync collection
+                collector.collect_symbols([symbol])
+            except Exception as e:
+                print(f"Error triggering immediate collection for {symbol}: {e}")
+                
             return favorite
 
     def remove_favorite(self, symbol: str):

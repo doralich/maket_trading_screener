@@ -8,66 +8,43 @@ import numpy as np
 class IndexerService:
     def __init__(self, session: Session):
         self.session = session
-        self.supported_exchanges = ["BINANCE", "BYBIT", "BITGET"]
+        self.supported_exchanges = ["BINANCE", "BYBIT", "BITGET", "OKX"]
 
     def sync_tickers(self):
         """
-        Fetches prioritized tickers from TradingView and syncs them to the local database.
-        Includes Top 1500 assets by Market Cap and their USDT/Perpetual counterparts.
+        Fetches ALL tickers from BINANCE, BYBIT, and BITGET and syncs them to the local database.
+        This ensures maximum robustness and that every available pair can be searched.
         """
-        print(f"Indexer: Starting targeted sync for {self.supported_exchanges}...")
+        print(f"Indexer: Starting full sync for {self.supported_exchanges}...")
         
-        # 1. Fetch Top 1500 Assets by Market Cap (which often uses USD/USDC pairs)
-        cs = CryptoScreener()
-        cs.where(CryptoField.EXCHANGE.isin(self.supported_exchanges))
-        cs.sort_by(CryptoField.MARKET_CAPITALIZATION, ascending=False)
-        cs.set_range(0, 1500)
-        
-        df_top = cs.get()
-        if df_top.empty:
-            print("Indexer: No tickers found matching criteria.")
+        all_ticker_data = []
+        for exchange in self.supported_exchanges:
+            print(f"Indexer: Fetching all tickers for {exchange}...")
+            cs = CryptoScreener()
+            cs.where(CryptoField.EXCHANGE == exchange)
+            
+            # Fetch in chunks to be safe, though 5000 is manageable
+            chunk_size = 1000
+            start = 0
+            while True:
+                cs.set_range(start, start + chunk_size)
+                try:
+                    df = cs.get()
+                    if df.empty:
+                        break
+                    all_ticker_data.append(df)
+                    if len(df) < chunk_size:
+                        break
+                    start += chunk_size
+                except Exception as e:
+                    print(f"Error fetching {exchange} chunk: {e}")
+                    break
+
+        if not all_ticker_data:
+            print("Indexer: No tickers found from any exchange.")
             return 0
 
-        # 2. Extract Base Assets and construct candidates (USDT and USDT.P)
-        # We identify the base by stripping known quotes
-        quotes = ["USDT", "USDC", "USD", "BTC", "ETH", "BNB", "EUR", "TRY", "JPY", "GBP"]
-        base_assets = set()
-        for _, row in df_top.iterrows():
-            name = row.get('Name', '')
-            # Clean name (remove .P if present)
-            clean_name = name.replace(".P", "")
-            base = clean_name
-            for quote in quotes:
-                if clean_name.endswith(quote) and len(clean_name) > len(quote):
-                    base = clean_name[:-len(quote)]
-                    break
-            base_assets.add((row['Exchange'], base))
-
-        # 3. Build a list of all candidates we want to ensure are in the index
-        candidates = []
-        for exchange, base in base_assets:
-            candidates.append(f"{exchange}:{base}USDT")
-            candidates.append(f"{exchange}:{base}USDT.P")
-        
-        # 4. Fetch all those candidates explicitly to validate and get metadata
-        # We do this in chunks because 'tickers' filter has limits
-        all_candidate_data = []
-        chunk_size = 100
-        candidate_list = list(set(candidates))
-        
-        for i in range(0, len(candidate_list), chunk_size):
-            chunk = candidate_list[i:i + chunk_size]
-            cs_cand = CryptoScreener()
-            cs_cand.symbols = {"tickers": chunk}
-            try:
-                df_cand = cs_cand.get()
-                all_candidate_data.append(df_cand)
-            except Exception:
-                pass
-
-        # 5. Combine and Sync
-        df_cand_combined = pd.concat(all_candidate_data) if all_candidate_data else pd.DataFrame()
-        df_final = pd.concat([df_top, df_cand_combined]).drop_duplicates(subset=['Symbol'])
+        df_final = pd.concat(all_ticker_data).drop_duplicates(subset=['Symbol'])
         valid_symbols = set(df_final['Symbol'].tolist())
         
         total_indexed = 0
@@ -120,7 +97,7 @@ class IndexerService:
             if t.symbol not in valid_symbols:
                 self.session.delete(t)
         
-        # Remove favorites that are no longer indexed
+        # Remove favorites that are no longer indexed (Unsupported Exchanges)
         all_favorites = self.session.exec(select(Favorite)).all()
         for f in all_favorites:
             if f.symbol not in valid_symbols:

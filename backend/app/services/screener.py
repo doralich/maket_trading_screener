@@ -10,16 +10,18 @@ import json
 class ScreenerService:
     def __init__(self):
         # Maps frontend intervals to TradingView field suffixes and indicator/change fields
+        # Note: API uses '|' for change fields (e.g., change|15), while indicators use '|' or '.' 
+        # based on library version. tvscreener specifically uses '|' for rolling changes.
         self.interval_map = {
-            "1": {"suffix": "_1", "change": "CHANGE_1MIN_PERCENT", "close": "CLOSE_1"},
-            "5": {"suffix": "_5", "change": "CHANGE_5MIN_PERCENT", "close": "CLOSE_5"},
-            "15": {"suffix": "_15", "change": "CHANGE_15MIN_PERCENT", "close": "CLOSE_15"},
-            "60": {"suffix": "_60", "change": "CHANGE_1H_PERCENT", "close": "CLOSE_60"},
+            "1": {"suffix": "_1", "change": "CHANGE_1", "close": "CLOSE_1"},
+            "5": {"suffix": "_5", "change": "CHANGE_5", "close": "CLOSE_5"},
+            "15": {"suffix": "_15", "change": "CHANGE_15", "close": "CLOSE_15"},
+            "60": {"suffix": "_60", "change": "CHANGE_60", "close": "CLOSE_60"},
             "120": {"suffix": "_120", "change": "CHANGE_120", "close": "CLOSE_120"},
-            "240": {"suffix": "_240", "change": "CHANGE_4H_PERCENT", "close": "CLOSE_240"},
+            "240": {"suffix": "_240", "change": "CHANGE_240", "close": "CLOSE_240"},
             "1D": {"suffix": "", "change": "CHANGE_PERCENT", "close": "PRICE"},
-            "1W": {"suffix": "_1W", "change": "CHANGE_1W_PERCENT", "close": "CLOSE_1W"},
-            "1M": {"suffix": "_1M", "change": "CHANGE_1M_PERCENT", "close": "CLOSE_1M"}
+            "1W": {"suffix": "_1W", "change": "CHANGE_1W", "close": "CLOSE_1W"},
+            "1M": {"suffix": "_1M", "change": "CHANGE_1M", "close": "CLOSE_1M"}
         }
 
     def _get_common_fields(self, interval: str):
@@ -75,10 +77,20 @@ class ScreenerService:
     def get_top_movers(self, limit: int = 50, interval: str = "1D", sort_descending: bool = True):
         try:
             cs = CryptoScreener()
+            # 1. Filter for Big Four Exchanges
             cs.where(CryptoField.EXCHANGE.isin(["BINANCE", "BYBIT", "BITGET", "OKX"]))
+            
+            # 2. Add Minimum Volume Filter to remove illiquid/junk tickers
+            # 50,000 USD minimum 24h volume ensures we see real market action
+            cs.where(CryptoField.VOLUME_24H_IN_USD > 50000)
+            
             cs.set_range(0, limit)
             f_map = self._get_common_fields(interval)
             
+            # 3. API-Side Sorting: Essential for true top/bottom detection
+            cs.sort_by(f_map["change"], ascending=not sort_descending)
+            
+            # 4. Request Fields
             request_fields = [CryptoField.NAME, CryptoField.EXCHANGE, CryptoField.DESCRIPTION]
             for f in f_map.values():
                 if f and hasattr(f, "field_name"):
@@ -90,6 +102,7 @@ class ScreenerService:
             if df.empty: return self._get_fallback_data()
             
             processed_df = self._process_dataframe(df, f_map)
+            # Final sort consistency
             processed_df = processed_df.sort_values(by='Change %', ascending=not sort_descending)
             return processed_df.head(limit).replace({np.nan: None}).to_dict(orient='records')
         except Exception as e:

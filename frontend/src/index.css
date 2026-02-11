@@ -43,3 +43,18 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #00ff41;
 }
+
+@keyframes breathing {
+  0%, 100% {
+    opacity: 0.4;
+    text-shadow: 0 0 2px rgba(0, 255, 65, 0.2);
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.8), 0 0 20px rgba(0, 255, 65, 0.4);
+  }
+}
+
+.animate-breathing {
+  animation: breathing 3s ease-in-out infinite;
+}

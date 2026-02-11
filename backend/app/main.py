@@ -42,7 +42,7 @@ async def broadcast_updates():
                 })
             except Exception as e:
                 print(f"Error in broadcast task: {e}")
-        await asyncio.sleep(10) # Update every 10 seconds
+        await asyncio.sleep(5) # Update every 5 seconds
 
 from app.database import init_db, engine
 from app.services.indexer import IndexerService

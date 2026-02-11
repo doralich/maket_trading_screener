@@ -6,6 +6,7 @@ from app.database import engine
 from datetime import datetime, timezone, timedelta
 import json
 import asyncio
+import pandas as pd
 
 # Monkeypatch tvscreener bug
 def has_recommendation(self):
@@ -15,7 +16,8 @@ FieldWithHistory.has_recommendation = has_recommendation
 
 class CollectorService:
     def __init__(self):
-        self.intervals = ["5", "10", "15", "60", "120", "240", "360", "720", "1D", "1W", "1M"]
+        # Only use intervals that are reliably supported by the Screener API
+        self.intervals = ["5", "15", "60", "240", "1D", "1W", "1M"]
         self.indicators = {
             "RSI": CryptoField.RELATIVE_STRENGTH_INDEX_14,
             "MACD": CryptoField.MACD_LEVEL_12_26,
@@ -56,42 +58,68 @@ class CollectorService:
             favorites = session.exec(select(Favorite)).all()
             if not favorites:
                 return
-
             symbols = [f.symbol for f in favorites]
-            print(f"Collector: Fetching data for {len(symbols)} symbols...")
+            self.collect_symbols(symbols)
 
+    def _sanitize_val(self, val):
+        if pd.isna(val) or val is None:
+            return None
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return None
+
+    def collect_symbols(self, symbols: list):
+        """
+        Collects data for a specific list of symbols across all intervals.
+        """
+        if not symbols:
+            return
+
+        print(f"Collector: Fetching data for {len(symbols)} symbols...")
+        with Session(engine) as session:
             # We'll fetch in batches if there are many symbols, but for now just all
             cs = CryptoScreener()
-            # Directly target favorite tickers
+            # Directly target specific tickers
             cs.symbols = {"tickers": symbols}
             
             # To get all intervals in one request for many tickers, the payload grows.
-            fields = [CryptoField.NAME]
+            fields = [CryptoField.NAME, CryptoField.PRICE, CryptoField.EXCHANGE]
             
-            # This will create a LOT of columns. 11 intervals * (5 OHLCV + 4 Indicators) = 99 columns!
-            # Plus the base columns.
             for interval in self.intervals:
-                # We create copies and set historical=False to avoid tvscreener automatically
-                # requesting [1] fields which fail for many custom intervals (like 10m).
+                # 1D is handled as base fields in tvscreener usually, 
+                # but we'll try to explicitly request it with interval if it's not the base.
+                # Actually, for 1D, we can just use the base fields.
+                if interval == "1D":
+                    fields.append(CryptoField.OPEN)
+                    fields.append(CryptoField.HIGH)
+                    fields.append(CryptoField.LOW)
+                    fields.append(CryptoField.VOLUME)
+                    for name, ind in self.indicators.items():
+                        fields.append(ind)
+                    continue
+
+                # Minutes/Weeks/Months
                 f_open = CryptoField.OPEN.with_interval(interval)
                 f_open.historical = False
                 fields.append(f_open)
                 
                 f_high = CryptoField.HIGH.with_interval(interval)
-                f_high.historical = False
+                f_high.highstorical = False
                 fields.append(f_high)
                 
                 f_low = CryptoField.LOW.with_interval(interval)
                 f_low.historical = False
                 fields.append(f_low)
                 
-                f_close = CryptoField.PRICE.with_interval(interval)
-                f_close.historical = False
-                fields.append(f_close)
-                
                 f_vol = CryptoField.VOLUME.with_interval(interval)
                 f_vol.historical = False
                 fields.append(f_vol)
+
+                # For Price (Close)
+                f_close = CryptoField.PRICE.with_interval(interval)
+                f_close.historical = False
+                fields.append(f_close)
 
                 for name, ind in self.indicators.items():
                     f_ind = ind.with_interval(interval)
@@ -99,11 +127,6 @@ class CollectorService:
                     fields.append(f_ind)
 
             cs.select(*fields)
-            
-            # We only want to fetch symbols that are favorites
-            # cs.where(CryptoField.NAME.isin([s.split(":")[1] for s in symbols]))
-            # Note: symbols are usually 'EXCHANGE:TICKER'
-            # Let's just fetch first 1000 and filter
             cs.set_range(0, 1000)
             
             try:
@@ -118,16 +141,27 @@ class CollectorService:
                     for interval in self.intervals:
                         rounded_ts = self._round_timestamp(now, interval)
                         
-                        # Get data for this interval
-                        # Labels are like 'Open (5)', 'High (5)', etc.
-                        # Note: tvscreener adds (interval) to the label
-                        
-                        # Indicators labels
+                        # Labels are different for 1D vs others
                         indicators_data = {}
-                        for name, ind in self.indicators.items():
-                            # Reconstruct the label tvscreener uses: f"{field.label} ({interval})"
-                            label = f"{ind.label} ({interval})"
-                            indicators_data[name] = row.get(label)
+                        if interval == "1D":
+                            for name, ind in self.indicators.items():
+                                indicators_data[name] = self._sanitize_val(row.get(ind.label))
+                            
+                            o = row.get("Open")
+                            h = row.get("High")
+                            l = row.get("Low")
+                            c = row.get("Price")
+                            v = row.get("Volume")
+                        else:
+                            for name, ind in self.indicators.items():
+                                label = f"{ind.label} ({interval})"
+                                indicators_data[name] = self._sanitize_val(row.get(label))
+                            
+                            o = row.get(f"Open ({interval})")
+                            h = row.get(f"High ({interval})")
+                            l = row.get(f"Low ({interval})")
+                            c = row.get(f"Price ({interval})")
+                            v = row.get(f"Volume ({interval})")
 
                         # Check if record exists
                         statement = select(MarketDataHistory).where(
@@ -146,15 +180,15 @@ class CollectorService:
                             session.add(record)
                         
                         # Update OHLCV
-                        record.open = row.get(f"Open ({interval})")
-                        record.high = row.get(f"High ({interval})")
-                        record.low = row.get(f"Low ({interval})")
-                        record.close = row.get(f"Price ({interval})")
-                        record.volume = row.get(f"Volume ({interval})")
+                        record.open = self._sanitize_val(o)
+                        record.high = self._sanitize_val(h)
+                        record.low = self._sanitize_val(l)
+                        record.close = self._sanitize_val(c)
+                        record.volume = self._sanitize_val(v)
                         record.indicators_json = json.dumps(indicators_data)
                 
                 session.commit()
-                print("Collector: Sync complete.")
+                print(f"Collector: Sync complete for {len(symbols)} symbols.")
             except Exception as e:
                 print(f"Collector Error: {e}")
 

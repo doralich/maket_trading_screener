@@ -32,4 +32,9 @@
 - [x] Task: Style Polish & Real-time Integration (0775fa1)
     - [x] Ensure favorite assets update via WebSocket alongside the main screener (0775fa1)
     - [x] Refactor "ASSETS_TRACKED" UI to match the requested screenshot aesthetic (0775fa1)
+- [x] Task: RSI Divergence & Help System
+    - [x] Implement robust real-time RSI divergence fetching (current + prev candle)
+    - [x] Implement 50-candle pivot detection for database-backed assets
+    - [x] Add floating terminal-style Help Notes for MACD and SMA headers
+    - [x] Correct SMA logic (Y/N based on price vs average)
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Frontend Search & Dashboard Integration' (Protocol in workflow.md)
