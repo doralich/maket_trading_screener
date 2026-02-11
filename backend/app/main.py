@@ -56,12 +56,16 @@ async def run_ticker_indexer():
     """
     while True:
         try:
-            with Session(engine) as session:
-                indexer = IndexerService(session)
-                indexer.sync_tickers()
+            # Run blocking indexing in a thread
+            await asyncio.to_thread(_sync_tickers_blocking)
         except Exception as e:
             print(f"Error in ticker indexer task: {e}")
         await asyncio.sleep(24 * 3600) # Run every 24 hours
+
+def _sync_tickers_blocking():
+    with Session(engine) as session:
+        indexer = IndexerService(session)
+        indexer.sync_tickers()
 
 async def run_data_collector():
     """
@@ -71,7 +75,8 @@ async def run_data_collector():
     collector = CollectorService()
     while True:
         try:
-            collector.collect_all()
+            # Run blocking collection in a thread
+            await asyncio.to_thread(collector.collect_all)
         except Exception as e:
             print(f"Error in data collector task: {e}")
         await asyncio.sleep(5 * 60) # Run every 5 minutes
@@ -84,7 +89,8 @@ async def run_data_purger():
     collector = CollectorService()
     while True:
         try:
-            collector.purge_old_data()
+            # Run blocking purge in a thread
+            await asyncio.to_thread(collector.purge_old_data)
         except Exception as e:
             print(f"Error in data purger task: {e}")
         await asyncio.sleep(24 * 3600) # Run every 24 hours
@@ -151,8 +157,9 @@ screener_router = APIRouter(prefix="/screener")
 favorites_router = APIRouter(prefix="/favorites")
 
 @screener_router.get("/top-movers")
-async def get_top_movers(limit: int = 50):
-    return screener_service.get_top_movers(limit=limit)
+async def get_top_movers(limit: int = 50, interval: str = "1D", sort: str = "desc"):
+    sort_descending = sort.lower() != "asc"
+    return screener_service.get_top_movers(limit=limit, interval=interval, sort_descending=sort_descending)
 
 @screener_router.get("/search")
 async def search_ticker(q: str = Query(..., min_length=1)):
@@ -161,6 +168,12 @@ async def search_ticker(q: str = Query(..., min_length=1)):
 @favorites_router.get("")
 async def get_favorites():
     return favorites_service.get_favorites()
+
+@favorites_router.get("/live")
+async def get_favorites_live(interval: str = "1D"):
+    favorites = favorites_service.get_favorites()
+    symbols = [f.symbol for f in favorites]
+    return screener_service.get_assets_by_symbols(symbols, interval)
 
 @favorites_router.post("", status_code=201)
 async def add_favorite(favorite: FavoriteCreate):
