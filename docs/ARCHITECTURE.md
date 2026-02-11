@@ -1,6 +1,6 @@
 # Project Architecture & Technical Deep-Dive
 
-This document provides an accurate technical overview of the Market Trading Screener architecture, mapping the exact code logic found in the backend services and frontend components.
+This document provides a 100% code-accurate overview of the Market Trading Screener architecture.
 
 ## System Architecture Diagram
 
@@ -9,11 +9,6 @@ graph TD
     %% External Layer
     subgraph External["External APIs"]
         TV[TradingView Screener API]
-    end
-
-    %% DevOps/Orchestration
-    subgraph DevOps["Orchestration"]
-        SSH[start.sh]
     end
 
     %% Backend Layer
@@ -25,11 +20,11 @@ graph TD
         IndexerSvc[IndexerService]
         FavSvc[FavoritesService]
         
-        subgraph BackgroundTasks["Background Workers (asyncio)"]
-            W1[broadcast_updates - 5s]
-            W2[run_data_collector - 5m]
-            W3[run_ticker_indexer - 24h]
-            W4[run_data_purger - 24h]
+        subgraph Workers["Background Workers"]
+            W1[broadcast_updates]
+            W2[run_data_collector]
+            W3[run_ticker_indexer]
+            W4[run_data_purger]
         end
     end
 
@@ -40,47 +35,35 @@ graph TD
 
     %% Frontend Layer
     subgraph Frontend["Frontend (React + Vite)"]
-        direction TB
         MainApp[App.tsx]
-        subgraph Components["UI Components"]
-            Search[UniversalSearch]
-            Table[CryptoTable]
-            Console[SystemConsole]
-        end
+        Search[UniversalSearch]
+        Table[CryptoTable]
     end
 
-    %% --- Logic Flow 1: Ticker Indexing ---
-    TV -.->|Full Exchange Scans| IndexerSvc
-    IndexerSvc ==>|1. Sync Index Table| DB
-    IndexerSvc ==>|2. Prune Invalid Favs| DB
+    %% --- 1. TICKER INDEXING (IndexerService) ---
+    TV -.->|Full Scan| IndexerSvc
+    IndexerSvc ==>|1. Sync Index| DB
+    IndexerSvc ==>|2. Prune Stale Favs| DB
 
-    %% --- Logic Flow 2: Live Market Data ---
-    W1 -->|Trigger| ScreenerSvc
-    ScreenerSvc -.->|Fetch Movers/Losers| TV
-    ScreenerSvc -->|Push JSON| App
+    %% --- 2. LIVE MARKET DATA (ScreenerService) ---
+    W1 -->|Trigger every 5s| ScreenerSvc
+    ScreenerSvc -.->|Fetch Snapshot| TV
+    ScreenerSvc -->|JSON Data| App
     App <==>|WebSocket| MainApp
 
-    %% --- Logic Flow 3: History Collection ---
-    W2 -->|Trigger| CollectorSvc
-    DB ---|1. Read Tracked Symbols| CollectorSvc
-    CollectorSvc -.->|2. Request Tech Snapshots| TV
-    CollectorSvc ==>|3. Persist OHLCV + Indicators| DB
+    %% --- 3. HISTORY COLLECTION (CollectorService) ---
+    W2 -->|Trigger every 5m| CollectorSvc
+    DB ==>|Step A: Read Fav List| CollectorSvc
+    CollectorSvc -.->|Step B: Request Techs| TV
+    CollectorSvc ==>|Step C: Persist Data| DB
 
-    %% --- Logic Flow 4: User Interaction ---
+    %% --- 4. USER ACTIONS (Favorites & Search) ---
     Search -->|REST Request| App
-    App -->|Search Query| ScreenerSvc
-    ScreenerSvc -->|SQL Query| DB
+    App -->|Invoke search_ticker| ScreenerSvc
+    ScreenerSvc ==>|SQL Query| DB
     
-    MainApp -->|Manage Tracked Assets| FavSvc
-    FavSvc <==>|Read/Write| DB
-
-    %% --- Component Relationships ---
-    SSH -->|Spawn Process| Backend
-    SSH -->|Spawn Process| Frontend
-    
-    MainApp --> Search
-    MainApp --> Table
-    MainApp --> Console
+    MainApp -->|Toggle Favorite| FavSvc
+    FavSvc ==>|CRUD Ops| DB
 
     %% Styling
     style TV fill:#f9f,stroke:#333,stroke-width:2px
@@ -88,43 +71,37 @@ graph TD
     style Backend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     
-    %% Explicitly separating lines
-    linkStyle 10 stroke:#00ff41,stroke-width:2px;
-    linkStyle 12 stroke:#00ff41,stroke-width:4px;
+    %% Color Code: Green (==>) for Database, Dotted (-.->) for Internet
+    linkStyle 3,4,9,12,15,17 stroke:#00ff41,stroke-width:3px;
+    linkStyle 2,7,11 stroke:#f9f,stroke-width:2px,stroke-dasharray: 5 5;
 ```
 
 ---
 
-## Detailed Logic Verification (100% Code-Aligned)
+## Code-Logic Mapping (Audit Results)
 
-### 1. Service Layer Roles
-- **IndexerService**: Performs paginated scans of the "Big Four" exchanges. Crucially, it manages the database integrity by **pruning** favorite assets that are no longer available on the supported exchanges.
-- **ScreenerService**: 
-    - **Live Scans**: Statelessly fetches the top 50 gainers or losers directly from the API.
-    - **Ticker Search**: Executes a `LIKE` SQL query against the local `ticker_index` table.
-- **CollectorService**: STATEFUL worker. It bridges the `favorites` table and the `market_data_history` table by taking interval-rounded snapshots.
-- **FavoritesService**: Simple CRUD interface for the `favorites` table.
+### 1. The Persistence Layer (SQLite)
+The **Green Arrows (`==>`)** in the diagram represent every point where the code interacts with `tradingview.db`. 
+*   **IndexerService**: Writes the full ticker list and **deletes** favorites if they are delisted from exchanges.
+*   **CollectorService**: Performs a "Read-then-Write" cycle. It reads the user's favorites, fetches live data, and writes a new row to the history table.
+*   **ScreenerService**: Performs a **Read-only** query during searches to find coins in the local index.
 
-### 2. Synchronization Mechanisms
-- **WebSocket (Movers)**: Hardcoded 5-second backend loop that broadcasts the result of `ScreenerService.get_top_movers(sort='desc')`.
-- **REST Polling (Losers)**: Frontend-triggered 5-second loop that explicitly requests `get_top_movers(sort='asc')`.
-- **Hybrid Merge**: `App.tsx` merges these two streams, prioritizing WebSocket for price updates but keeping the Losers sort stable during polling.
+### 2. The Communication Layer
+*   **External (`-.->`)**: Represents the REST API snapshots pulled from TradingView. This is "Outbound" traffic.
+*   **Internal WebSocket (`<==>`)**: The bi-directional pipe between your Backend and Browser. It only pushes the "Movers" data to keep the dashboard fast.
+*   **Internal REST**: Standard "Question and Answer" requests for things like searching a coin or viewing "Top Losers."
 
-### 3. Data Flow Audit
-- **TV $\rightarrow$ Backend**: Exclusively **REST (HTTP POST)** snapshots.
-- **Backend $\rightarrow$ UI**: 
-    - **Real-time**: WebSocket (WS).
-    - **Management/Search**: REST (JSON).
-- **Backend $\leftrightarrow$ DB**: **SQLModel (SQLite)**. Service-to-DB links are now explicitly mapped in the diagram (e.g., ScreenerSvc reading the index for searches).
+### 3. Service Definitions
+*   **IndexerService**: The "Librarian." Keeps the database index of 5,800+ coins fresh.
+*   **CollectorService**: The "Time Machine." Saves snapshots every 5 minutes to build your 6-month local history.
+*   **ScreenerService**: The "Navigator." Filters the whole market to find winners and losers in real-time.
+*   **FavoritesService**: The "Manager." Simply handles adding or removing coins from your tracking list.
 
 ---
 
-## Technology Stack Justification (Updated)
-
-| Category | Technology | Purpose | Newcomer Analogy |
-| :--- | :--- | :--- | :--- |
-| **Backend** | **FastAPI (Python)** | The "Brain" of the operation. Handles calculations and coordinates data. | Like a high-speed dispatch center. |
-| **Frontend** | **React (TypeScript)** | The "Face" of the operation. Handles everything the user sees and clicks. | Like a dynamic, self-updating Lego set. |
-| **Database** | **SQLite (SQLModel)** | The "Memory." Stores your favorites and history in a local file. | Like a very organized, digital filing cabinet. |
-| **Build Tool** | **Vite** | The "Workshop." Bundles the frontend code and runs the dev server. | Like a super-fast assembly line. |
-| **Styles** | **Tailwind CSS** | The "Paint." Controls the colors, spacing, and layout. | Like a set of standardized stickers you can slap onto any component. |
+## Newcomer Development Workflow
+To add a new feature (e.g., a "Volume Alert"):
+1.  **Database**: Add an `alert_threshold` column to the `Favorite` model.
+2.  **Service**: Update `ScreenerService` to check if current volume exceeds that threshold.
+3.  **API**: Send an `alert` flag through the WebSocket.
+4.  **UI**: Make the row in `CryptoTable` flash or glow when the flag is true.

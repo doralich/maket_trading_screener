@@ -7,11 +7,6 @@ graph TD
         TV[TradingView Screener API]
     end
 
-    %% DevOps/Orchestration
-    subgraph DevOps["Orchestration"]
-        SSH[start.sh]
-    end
-
     %% Backend Layer
     subgraph Backend["Backend (FastAPI + Python)"]
         direction TB
@@ -21,11 +16,11 @@ graph TD
         IndexerSvc[IndexerService]
         FavSvc[FavoritesService]
         
-        subgraph BackgroundTasks["Background Workers (asyncio)"]
-            W1[broadcast_updates - 5s]
-            W2[run_data_collector - 5m]
-            W3[run_ticker_indexer - 24h]
-            W4[run_data_purger - 24h]
+        subgraph Workers["Background Workers"]
+            W1[broadcast_updates]
+            W2[run_data_collector]
+            W3[run_ticker_indexer]
+            W4[run_data_purger]
         end
     end
 
@@ -36,47 +31,35 @@ graph TD
 
     %% Frontend Layer
     subgraph Frontend["Frontend (React + Vite)"]
-        direction TB
         MainApp[App.tsx]
-        subgraph Components["UI Components"]
-            Search[UniversalSearch]
-            Table[CryptoTable]
-            Console[SystemConsole]
-        end
+        Search[UniversalSearch]
+        Table[CryptoTable]
     end
 
-    %% --- Logic Flow 1: Ticker Indexing ---
-    TV -.->|Full Exchange Scans| IndexerSvc
-    IndexerSvc ==>|1. Sync Index Table| DB
-    IndexerSvc ==>|2. Prune Invalid Favs| DB
+    %% --- 1. TICKER INDEXING (IndexerService) ---
+    TV -.->|Full Scan| IndexerSvc
+    IndexerSvc ==>|1. Sync Index| DB
+    IndexerSvc ==>|2. Prune Stale Favs| DB
 
-    %% --- Logic Flow 2: Live Market Data ---
-    W1 -->|Trigger| ScreenerSvc
-    ScreenerSvc -.->|Fetch Movers/Losers| TV
-    ScreenerSvc -->|Push JSON| App
-    App <==>|WebSocket| MainApp
+    %% --- 2. LIVE MARKET DATA (ScreenerService) ---
+    W1 -->|Trigger every 5s| ScreenerSvc
+    ScreenerSvc -.->|Fetch Snapshot| TV
+    ScreenerSvc -->|JSON Data| App
+    App <-->|WebSocket| MainApp
 
-    %% --- Logic Flow 3: History Collection ---
-    W2 -->|Trigger| CollectorSvc
-    DB ---|1. Read Tracked Symbols| CollectorSvc
-    CollectorSvc -.->|2. Request Tech Snapshots| TV
-    CollectorSvc ==>|3. Persist OHLCV + Indicators| DB
+    %% --- 3. HISTORY COLLECTION (CollectorService) ---
+    W2 -->|Trigger every 5m| CollectorSvc
+    DB ==>|Step A: Read Fav List| CollectorSvc
+    CollectorSvc -.->|Step B: Request Techs| TV
+    CollectorSvc ==>|Step C: Persist Data| DB
 
-    %% --- Logic Flow 4: User Interaction ---
+    %% --- 4. USER ACTIONS (Favorites & Search) ---
     Search -->|REST Request| App
-    App -->|Search Query| ScreenerSvc
-    ScreenerSvc -->|SQL Query| DB
+    App -->|Invoke search_ticker| ScreenerSvc
+    ScreenerSvc ==>|SQL Query| DB
     
-    MainApp -->|Manage Tracked Assets| FavSvc
-    FavSvc <==>|Read/Write| DB
-
-    %% --- Component Relationships ---
-    SSH -->|Spawn Process| Backend
-    SSH -->|Spawn Process| Frontend
-    
-    MainApp --> Search
-    MainApp --> Table
-    MainApp --> Console
+    MainApp -->|Toggle Favorite| FavSvc
+    FavSvc ==>|CRUD Ops| DB
 
     %% Styling
     style TV fill:#f9f,stroke:#333,stroke-width:2px
@@ -84,9 +67,9 @@ graph TD
     style Backend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     
-    %% Explicitly separating lines
-    linkStyle 10 stroke:#00ff41,stroke-width:2px;
-    linkStyle 12 stroke:#00ff41,stroke-width:4px;
+    %% Color Code: Green (==>) for Database, Dotted (-.->) for Internet
+    linkStyle 3,4,9,12,15,17 stroke:#00ff41,stroke-width:3px;
+    linkStyle 2,7,11 stroke:#f9f,stroke-width:2px,stroke-dasharray: 5 5;
 ```
 
 A high-precision, retro-terminal style cryptocurrency screener for the "Big Four" exchanges: **Binance, Bybit, Bitget, and OKX**.
