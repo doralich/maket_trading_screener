@@ -1,5 +1,7 @@
 # Market Trading Screener
 
+![Project Architecture](docs/img/architecture.png)
+
 A high-precision, retro-terminal style cryptocurrency screener for the "Big Four" exchanges: **Binance, Bybit, Bitget, and OKX**.
 
 ## Features
