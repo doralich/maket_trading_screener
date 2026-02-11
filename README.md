@@ -68,8 +68,8 @@ graph TD
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     
     %% Color Code: Green (==>) for Database, Dotted (-.->) for Internet
-    linkStyle 3,4,9,12,15,17 stroke:#00ff41,stroke-width:3px;
-    linkStyle 2,7,11 stroke:#f9f,stroke-width:2px,stroke-dasharray: 5 5;
+    linkStyle 1,2,8,10,13,15 stroke:#00ff41,stroke-width:3px;
+    linkStyle 0,4,9 stroke:#f9f,stroke-width:2px,stroke-dasharray: 5 5;
 ```
 
 A high-precision, retro-terminal style cryptocurrency screener for the "Big Four" exchanges: **Binance, Bybit, Bitget, and OKX**.

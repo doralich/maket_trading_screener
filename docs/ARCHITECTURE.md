@@ -72,8 +72,9 @@ graph TD
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     
     %% Color Code: Green (==>) for Database, Dotted (-.->) for Internet
-    linkStyle 3,4,9,12,15,17 stroke:#00ff41,stroke-width:3px;
-    linkStyle 2,7,11 stroke:#f9f,stroke-width:2px,stroke-dasharray: 5 5;
+    %% Indices: 0:TV->Idx, 1:Idx->DB, 2:Idx->DB, 3:W1->Scr, 4:Scr->TV, 5:Scr->App, 6:App->Main, 7:W2->Coll, 8:DB->Coll, 9:Coll->TV, 10:Coll->DB, 11:Search->App, 12:App->Scr, 13:Scr->DB, 14:Main->Fav, 15:Fav->DB
+    linkStyle 1,2,8,10,13,15 stroke:#00ff41,stroke-width:3px;
+    linkStyle 0,4,9 stroke:#f9f,stroke-width:2px,stroke-dasharray: 5 5;
 ```
 
 ---
