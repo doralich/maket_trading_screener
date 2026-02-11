@@ -48,30 +48,29 @@ graph TD
     SSH -->|Starts| Backend
     SSH -->|Starts| Frontend
 
-    %% Fetching Logic
-    ScreenerSvc -->|Fetch Movers/Losers| TV
-    CollectorSvc -->|Fetch History| TV
-    IndexerSvc -->|Fetch Full Catalog| TV
+    %% 1. Ticker Indexing Loop (Indexer)
+    TV -->|Full Catalog| IndexerSvc
+    IndexerSvc -->|Sync Index Table| DB
 
-    %% Write to DB
-    CollectorSvc -->|Persist History| DB
-    IndexerSvc -->|Sync Index| DB
-    FavSvc -->|Manage Tickers| DB
+    %% 2. Live Market Flow (Screener)
+    TV -->|Movers/Losers Snapshot| ScreenerSvc
+    DB -->|Read Index for Search| ScreenerSvc
+    ScreenerSvc -->|Process Data| App
 
-    %% Read from DB (Return Paths)
-    DB -->|Read Index| ScreenerSvc
-    DB -->|Load Favorite History| App
-    DB -->|Load Tracked List| FavSvc
+    %% 3. History Collection Loop (Collector)
+    DB -->|1. Read Favorite List| CollectorSvc
+    CollectorSvc -->|2. Request Snapshots| TV
+    TV -->|3. Current Indicators| CollectorSvc
+    CollectorSvc -->|4. Persist Data Point| DB
 
-    %% Internal Backend Routing
-    App --> ScreenerSvc
-    App --> CollectorSvc
-    App --> IndexerSvc
-    App --> FavSvc
+    %% 4. User Interaction Flow (Favorites)
+    MainApp -->|Add/Remove| App
+    App -->|Manage| FavSvc
+    FavSvc <-->|Write/Read| DB
 
-    %% App to Frontend
-    MainApp <-->|WebSocket: Real-time Movers| App
-    MainApp <-->|REST: Initial Data / Favorites / Losers| App
+    %% 5. App to Frontend Communication
+    App <-->|WebSocket: Live Movers| MainApp
+    App <-->|REST: Losers/History/Search| MainApp
 
     MainApp --> Search
     MainApp --> Table
