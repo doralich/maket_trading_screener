@@ -1,25 +1,26 @@
 # Market Trading Screener
 
 ```mermaid
-graph TD
+flowchart TD
     %% EXTERNAL DATA SOURCE
     subgraph External["[EXTERNAL] TradingView Infrastructure"]
-        TV_API[Screener API - REST/POST]
+        TV_API[Screener API - REST Snapshots]
     end
 
     %% BACKEND CORE
     subgraph Backend["[BACKEND] FastAPI Engine"]
         direction TB
-        Main[main.py - API Gateway]
+        Main[main.py - API & WS Gateway]
         
         subgraph Services["Service Layer"]
             S_Screen[ScreenerService]
             S_Coll[CollectorService]
             S_Idx[IndexerService]
             S_Fav[FavoritesService]
+            S_Hist[FavHistoryService]
         end
 
-        subgraph BackgroundTasks["Background Workers"]
+        subgraph Workers["Async Background Workers"]
             W_Broad[broadcast_updates - 5s]
             W_Coll[run_data_collector - 5m]
             W_Idx[run_ticker_indexer - 24h]
@@ -34,49 +35,56 @@ graph TD
 
     %% FRONTEND CORE
     subgraph Frontend["[FRONTEND] React Dashboard"]
+        direction TB
+        %% Search is placed at the top of Frontend to prevent line crossing to Backend
+        Search[UniversalSearch.tsx]
         MainApp[App.tsx - State Manager]
-        subgraph UI["UI Components"]
-            Search[UniversalSearch.tsx]
+        
+        subgraph UI["Data Display Components"]
             Table[CryptoTable.tsx]
             Console[SystemConsole.tsx]
         end
     end
 
     %% --- DATA FLOW 1: DISCOVERY (Indexing) ---
-    TV_API -.->|1. Fetch Full Catalog| S_Idx
-    S_Idx ==>|2. Sync Ticker Table| DB
-    S_Idx ==>|3. Prune Invalid Tracked| DB
+    TV_API -.->|1. Fetch Catalog| S_Idx
+    S_Idx ==>|2. Sync Tickers| DB
+    S_Idx ==>|3. Prune Tracked| DB
 
     %% --- DATA FLOW 2: LIVE MARKET (Streaming) ---
     W_Broad -->|Trigger| S_Screen
-    S_Screen -.->|4. Snapshot Request| TV_API
-    S_Screen -->|5. JSON Mover Data| Main
-    Main <==>|6. WebSocket Push| MainApp
+    S_Screen -.->|4. Fetch Snapshots| TV_API
+    S_Screen -->|5. Format JSON| Main
+    Main <==>|6. WebSocket/REST| MainApp
 
     %% --- DATA FLOW 3: HISTORY (Collection) ---
     W_Coll -->|Trigger| S_Coll
     DB ==>|7. Read Favorites| S_Coll
-    S_Coll -.->|8. Technical Snapshot| TV_API
-    S_Coll ==>|9. Append History Row| DB
+    S_Coll -.->|8. Snapshot Fetch| TV_API
+    S_Coll ==>|9. Append History| DB
 
-    %% --- DATA FLOW 4: INTERACTION (Search & Track) ---
-    Search -->|REST Request| Main
-    Main -->|Local Lookup| S_Screen
-    S_Screen ==>|10. SQL LIKE Query| DB
+    %% --- DATA FLOW 4: INTERACTION ---
+    Search -->|10. Search Query| Main
+    Main -->|11. SQL LIKE| S_Screen
+    S_Screen ==>|12. Ticker Lookup| DB
     
-    MainApp -->|Toggle Track| S_Fav
-    S_Fav ==>|11. CRUD Ops| DB
+    MainApp -->|13. Toggle Track| S_Fav
+    S_Fav ==>|14. CRUD Ops| DB
 
-    %% --- LAYOUT CONNECTIONS ---
-    MainApp --> Search
-    MainApp --> Table
-    MainApp --> Console
+    MainApp -->|15. Fetch History| S_Hist
+    S_Hist ==>|16. Read Data| DB
+
+    %% --- UI CONNECTIONS ---
+    MainApp --- Search
+    MainApp --- Table
+    MainApp --- Console
 
     %% --- STYLING ---
     style TV_API fill:#f9f,stroke:#333,stroke-width:2px
     style DB fill:#00ff41,stroke:#333,stroke-width:2px,color:#000
     style Backend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
     style Frontend fill:#1a1a1a,stroke:#00ff41,stroke-width:1px,color:#00ff41
+    style External fill:#000,stroke:#f9f,stroke-dasharray: 5 5
 ```
 
 A high-precision, retro-terminal style cryptocurrency screener for the "Big Four" exchanges: **Binance, Bybit, Bitget, and OKX**.
