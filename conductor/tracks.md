@@ -6,3 +6,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: Favorite Tickers & Multi-Timeframe Historical Data Persistence**
 *Link: [./tracks/favorites_tracking_20260209/](./tracks/favorites_tracking_20260209/)*
+
+---
+
+- [x] **Track: Fix Top Losers Data Shifting Bug**
+*Link: [./tracks/fix_top_losers_flicker_20260212/](./tracks/fix_top_losers_flicker_20260212/)*

@@ -16,9 +16,6 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Fix Implementation' (Protocol in workflow.md) [checkpoint: 4031563]
 
 ## Phase 3: Final Verification and Cleanup
-- [ ] Task: Perform a comprehensive manual verification (Visual Check) as per the specification.
-    - [ ] Start the application.
-    - [ ] Open the "Top Losers" tab.
-    - [ ] Observe for 5-10 update cycles (approx. 1 minute) to ensure no positive values appear.
-- [ ] Task: Ensure no regression in "Top Movers" (Gainers) tab.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Final Verification and Cleanup' (Protocol in workflow.md)
+- [x] Task: Perform a comprehensive manual verification (Visual Check) as per the specification. [commit: 450bd74]
+- [x] Task: Ensure no regression in "Top Movers" (Gainers) tab. [commit: 450bd74]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Final Verification and Cleanup' (Protocol in workflow.md) [checkpoint: 450bd74]
