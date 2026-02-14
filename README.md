@@ -21,7 +21,7 @@ flowchart TD
         end
 
         subgraph Workers["Async Background Workers"]
-            W_Broad[broadcast_updates - 5s]
+            W_Broad[broadcast_updates - 10s]
             W_Coll[run_data_collector - 5m]
             W_Idx[run_ticker_indexer - 24h]
             W_Purge[run_data_purger - 24h]
@@ -38,7 +38,12 @@ flowchart TD
         direction TB
         %% Search is placed at the top of Frontend to prevent line crossing to Backend
         Search[UniversalSearch.tsx]
-        MainApp[App.tsx - State Manager]
+        
+        subgraph MainApp["App.tsx - Isolated State Manager"]
+            S_Movers[(moversData)]
+            S_Losers[(losersData)]
+            S_Favs[(trackedData)]
+        end
         
         subgraph UI["Data Display Components"]
             Table[CryptoTable.tsx]
@@ -55,7 +60,8 @@ flowchart TD
     W_Broad -->|Trigger| S_Screen
     S_Screen -.->|4. Fetch Snapshots| TV_API
     S_Screen -->|5. Format JSON| Main
-    Main <==>|6. WebSocket/REST| MainApp
+    Main -->|6a. WebSocket Push (1D)| S_Movers
+    Main -->|6b. REST Polling| S_Losers
 
     %% --- DATA FLOW 3: HISTORY (Collection) ---
     W_Coll -->|Trigger| S_Coll
@@ -90,7 +96,7 @@ flowchart TD
 A high-precision, retro-terminal style cryptocurrency screener for the "Big Four" exchanges: **Binance, Bybit, Bitget, and OKX**.
 
 ## Features
-- **Real-time Monitoring**: Top Movers and Top Losers tabs with 5-second unified refresh.
+- **Real-time Monitoring**: Top Movers and Top Losers tabs with **10-second** unified refresh.
 - **Full Market Indexing**: Access to over 5,800+ trading pairs (Spot and USDT Perpetuals).
 - **Technical Indicators**: Integrated SMA (20/50/200), MACD, and RSI values.
 - **Interactive Help**: Floating terminal-style documentation for technical indicators.
@@ -100,6 +106,9 @@ A high-precision, retro-terminal style cryptocurrency screener for the "Big Four
 
 ## Technical Highlights
 - **Server-Side Sorting**: True "Top Movers" and "Top Losers" are calculated across the entire 5,800+ ticker catalog via API sort commands.
+- **Isolated State Management**: Frontend uses separate data stores for Movers and Losers to eliminate race conditions and data "shifting."
+- **Redundant Filter Enforcement**: Dual-layer filtering (API + local) ensures Top Losers lists strictly contain negative changes.
+- **Robust Column Mapping**: Case-insensitive matching for API result columns ensures high-precision interval metrics (1M, 5M, 15M, etc.) are correctly identified.
 - **Hybrid Communication**: Uses WebSockets for live gainer pushes and REST for high-precision history and loser polling.
 - **Data Retention**: Local SQLite database with a 6-month rolling purge policy for favorite indicators.
 - **Liquidity Guard**: Integrated 50,000 USD (24h) volume floor to filter out illiquid assets.

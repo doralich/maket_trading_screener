@@ -39,3 +39,5 @@ I want to build a local browser based app based on the link: https://github.com/
 - **Case-Insensitive Data Mapping:** Backend processing uses case-insensitive matching for API result columns (e.g., 'Change|5' vs 'change|5') to ensure high-precision interval metrics are correctly identified and displayed.
 - **Liquidity Protection:** A global 50,000 USD (24h) volume floor is applied to all "Top" queries to filter out illiquid pairs and price glitches, ensuring only active, tradable assets are displayed.
 - **Interval Mapping:** Uses precise `change|X` API fields for rolling intraday performance tracking (1m, 5m, 15m, 1h, 4h) to maintain consistency with standard technical analysis candles.
+- **High-Frequency Unified Refresh:** Implements a system-wide 10-second update interval across WebSocket broadcasts and REST polling for maximum responsiveness.
+- **Isolated State Management:** Frontend architecture separates Movers and Losers into independent data stores to eliminate race conditions and ensure UI stability during high-frequency updates.

@@ -25,7 +25,7 @@ flowchart TD
         end
 
         subgraph Workers["Async Background Workers"]
-            W_Broad[broadcast_updates - 5s]
+            W_Broad[broadcast_updates - 10s]
             W_Coll[run_data_collector - 5m]
             W_Idx[run_ticker_indexer - 24h]
             W_Purge[run_data_purger - 24h]
@@ -42,7 +42,12 @@ flowchart TD
         direction TB
         %% Search is placed at the top of Frontend to prevent line crossing to Backend
         Search[UniversalSearch.tsx]
-        MainApp[App.tsx - State Manager]
+        
+        subgraph MainApp["App.tsx - Isolated State Manager"]
+            S_Movers[(moversData)]
+            S_Losers[(losersData)]
+            S_Favs[(trackedData)]
+        end
         
         subgraph UI["Data Display Components"]
             Table[CryptoTable.tsx]
@@ -59,7 +64,8 @@ flowchart TD
     W_Broad -->|Trigger| S_Screen
     S_Screen -.->|4. Fetch Snapshots| TV_API
     S_Screen -->|5. Format JSON| Main
-    Main <==>|6. WebSocket/REST| MainApp
+    Main -->|6a. WebSocket Push (1D)| S_Movers
+    Main -->|6b. REST Polling| S_Losers
 
     %% --- DATA FLOW 3: HISTORY (Collection) ---
     W_Coll -->|Trigger| S_Coll
@@ -108,10 +114,11 @@ flowchart TD
 
 ### Phase C: Data Ingestion & Delivery
 1.  **The Live Scan**: The `ScreenerService` performs server-side sorting at TradingView to find the "True" top performers from the entire ~5,800+ asset catalog.
-2.  **The Hybrid Bridge**:
-    *   **Gainers**: Pushed automatically via **WebSocket** every 5 seconds.
-    *   **Losers**: Pulled via **REST API** every 5 seconds (triggered by tab selection).
-    *   **Favorites**: Pulled via REST to allow the user to change timeframes (e.g., viewing 1H history while the main market is on 5M) independently.
+2.  **The Isolated Bridge**:
+    *   **Gainers**: Pushed automatically via **WebSocket** every 10 seconds to the `moversData` state.
+    *   **Losers**: Pulled via **REST API** every 10 seconds to the `losersData` state.
+    *   **State Isolation**: By separating Movers and Losers into distinct states, the system eliminates race conditions where high-frequency updates from different sources could "clobber" each other.
+    *   **Favorites**: Pulled via REST independently to allow the user to change timeframes (e.g., viewing 1H history while the main market is on 5M) without data corruption.
 
 ---
 
@@ -122,6 +129,8 @@ The system uses **stateless REST snapshots** from the external API. This is by d
 
 ### 2. Processing Logic
 - **Precision Management**: The backend enforces 8 decimal places for price and 6 for technical indicators.
+- **Robust Column Mapping**: Implements **case-insensitive matching** for API result columns (e.g., 'Change|5' vs 'change|5') to ensure interval-specific candle metrics are correctly identified.
+- **Redundant Filtering**: Enforces a dual-layer filtering policy (API-level query + local safety checks) to ensure Top Losers lists strictly contain negative changes, eliminating UI "flickering."
 - **Liquidity Floor**: A global filter `VOLUME_24H_IN_USD > 50,000` is applied to all market-wide scans to ensure reliability.
 - **Interval Mapping**: The system maps frontend requests (e.g., "15M") to specific API change fields (`change|15`) to ensure the percentage values match the specific timeframe candles.
 
@@ -137,5 +146,5 @@ When a user "Tracks" an asset:
 
 - **FastAPI**: Used as the asynchronous orchestrator. It manages the lifecycle of the four background workers using `asyncio.create_task`.
 - **SQLModel**: Serves as the single source of truth for data shapes. The models in `app/models.py` define both the database schema and the API response structures.
-- **React 19 + Vite**: Chosen for high-performance rendering. The `CryptoTable` uses memoized filtering logic to handle the 5-second data bursts without UI stuttering.
+- **React 19 + Vite**: Chosen for high-performance rendering. The dashboard uses **isolated state management** to handle 10-second data bursts from multiple sources without UI stuttering or race conditions.
 - **Tailwind CSS**: Implements the high-precision "Retro-Terminal" UI, including custom animations like `animate-breathing` for system status.
