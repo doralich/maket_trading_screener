@@ -8,12 +8,12 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Diagnosis and Reproduction' (Protocol in workflow.md) [checkpoint: bfbe17f]
 
 ## Phase 2: Fix Implementation
-- [~] Task: Implement the fix in the sorting/filtering logic.
-    - [ ] Update the service method to strictly enforce `change < 0` for the Top Losers list.
-    - [ ] Ensure the fix handles edge cases (e.g., 0.00 change, very small positive numbers).
-- [ ] Task: Update the reproduction test to verify the fix.
-    - [ ] Run the test from Phase 1 and ensure it now passes consistently.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Fix Implementation' (Protocol in workflow.md)
+- [x] Task: Implement the fix in the sorting/filtering logic. [commit: f37e88f]
+    - [x] Update the service method to strictly enforce `change < 0` for the Top Losers list. [commit: f37e88f]
+    - [x] Ensure the fix handles edge cases (e.g., 0.00 change, very small positive numbers). [commit: f37e88f]
+- [x] Task: Update the reproduction test to verify the fix. [commit: f37e88f]
+    - [x] Run the test from Phase 1 and ensure it now passes consistently. [commit: f37e88f]
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Fix Implementation' (Protocol in workflow.md) [checkpoint: 4031563]
 
 ## Phase 3: Final Verification and Cleanup
 - [ ] Task: Perform a comprehensive manual verification (Visual Check) as per the specification.
