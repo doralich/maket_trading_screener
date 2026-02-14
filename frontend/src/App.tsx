@@ -19,7 +19,8 @@ interface Favorite {
 
 const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString())
-  const [marketData, setMarketData] = useState<MarketUpdate[]>([])
+  const [moversData, setMoversData] = useState<MarketUpdate[]>([])
+  const [losersData, setLosersData] = useState<MarketUpdate[]>([])
   const [favorites, setFavorites] = useState<Favorite[]>([])
   const [activeInterval, setActiveInterval] = useState('5')
   const [liveInterval, setLiveInterval] = useState('1D')
@@ -56,12 +57,27 @@ const App: React.FC = () => {
 
   const fetchLiveMovers = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/screener/top-movers?interval=${liveInterval}&limit=50&sort=${activeSort}`);
+      const response = await fetch(`http://localhost:8000/api/v1/screener/top-movers?interval=${liveInterval}&limit=50&sort=desc`);
       const data = await response.json();
-      setMarketData(data);
-      consoleRef.current?.writeLog(`FETCHED_LIVE_${activeSort === 'desc' ? 'MOVERS' : 'LOSERS'}: ${liveInterval}_TIMEFRAME`, 'info');
+      setMoversData(data);
+      if (activeSort === 'desc') {
+        consoleRef.current?.writeLog(`FETCHED_LIVE_MOVERS: ${liveInterval}_TIMEFRAME`, 'info');
+      }
     } catch (error) {
       console.error('Error fetching live movers:', error);
+    }
+  };
+
+  const fetchLiveLosers = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/screener/top-movers?interval=${liveInterval}&limit=50&sort=asc`);
+      const data = await response.json();
+      setLosersData(data);
+      if (activeSort === 'asc') {
+        consoleRef.current?.writeLog(`FETCHED_LIVE_LOSERS: ${liveInterval}_TIMEFRAME`, 'info');
+      }
+    } catch (error) {
+      console.error('Error fetching live losers:', error);
     }
   };
 
@@ -75,21 +91,18 @@ const App: React.FC = () => {
       const response = await fetch(`http://localhost:8000/api/v1/favorites/live?interval=${activeInterval}`);
       const data = await response.json();
       
+      // Merge with live data only if intervals match
       const updatedData = data.map((item: any) => {
-        const wsUpdate = marketData.find(d => d.Symbol === item.Symbol);
-        // CRITICAL FIX: Only merge if the intervals match.
-        // liveInterval is for REST poll, while WebSocket pushes (top-movers) are always 1D.
-        // We only merge if the activeInterval matches the source of marketData.
+        // Only merge if activeInterval is 1D (WS source) or matches current liveInterval (REST source)
+        const liveSource = activeSort === 'desc' ? moversData : losersData;
+        const liveItem = liveSource.find(d => d.Symbol === item.Symbol);
         
-        const isRestMatch = activeInterval === liveInterval;
-        const isWsMatch = activeInterval === '1D' && activeSort === 'desc';
-        
-        if (wsUpdate && (isRestMatch || isWsMatch)) {
+        if (liveItem && (activeInterval === '1D' || activeInterval === liveInterval)) {
           return {
             ...item,
-            Price: wsUpdate.Price ?? item.Price,
-            'Change %': wsUpdate['Change %'] ?? item['Change %'],
-            Volume: wsUpdate.Volume ?? item.Volume
+            Price: liveItem.Price ?? item.Price,
+            'Change %': liveItem['Change %'] ?? item['Change %'],
+            Volume: liveItem.Volume ?? item.Volume
           };
         }
         return item;
@@ -105,22 +118,26 @@ const App: React.FC = () => {
     fetchFavorites();
   }, []);
 
-  // Update live data when interval or sort changes
+  // Polling for Movers
   useEffect(() => {
-    setMarketData([]); // Clear old data to prevent cross-tab flickering
     fetchLiveMovers();
-  }, [liveInterval, activeSort]);
+    const poll = setInterval(fetchLiveMovers, 30000);
+    return () => clearInterval(poll);
+  }, [liveInterval]);
 
-  // Update tracked data when favorites, interval, or new market data arrives
+  // Polling for Losers
+  useEffect(() => {
+    fetchLiveLosers();
+    const poll = setInterval(fetchLiveLosers, 30000);
+    return () => clearInterval(poll);
+  }, [liveInterval]);
+
+  // Polling for Tracked
   useEffect(() => {
     fetchTrackedData();
-  }, [favorites, activeInterval, marketData]);
-
-  // Dedicated poll for tracked assets to ensure freshness without relying on movers/losers feed
-  useEffect(() => {
     const poll = setInterval(fetchTrackedData, 30000);
     return () => clearInterval(poll);
-  }, [favorites, activeInterval]);
+  }, [favorites, activeInterval, liveInterval, moversData, losersData]);
 
   useEffect(() => {
     const connect = () => {
@@ -137,10 +154,8 @@ const App: React.FC = () => {
       ws.onmessage = (event) => {
         const message: WSMessage = JSON.parse(event.data);
         if (message.type === 'market_update' && message.data) {
-          // Sync check: Only update from WS if timeframe and sort match the broadcast source (1D, Desc)
-          if (activeSort === 'desc' && liveInterval === '1D') {
-            setMarketData(message.data);
-          }
+          // WebSocket is 1D Desc only. Only update moversData state.
+          setMoversData(message.data);
         }
       };
 
@@ -158,7 +173,7 @@ const App: React.FC = () => {
 
     connect();
     return () => wsRef.current?.close();
-  }, [activeSort]); // Re-connect logic or handle sort change impact on WS
+  }, []); // WS is persistent and updates moversData only
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -167,12 +182,7 @@ const App: React.FC = () => {
     return () => clearInterval(timer)
   }, [])
 
-  // Auto-polling for both Movers and Losers to ensure perfect consistency
-  useEffect(() => {
-    const poll = setInterval(fetchLiveMovers, 30000);
-    return () => clearInterval(poll);
-  }, [activeSort, liveInterval]);
-
+  const currentMarketData = activeSort === 'desc' ? moversData : losersData;
   const connectionStatus = readyState === 1 ? 'ONLINE' : readyState === 0 ? 'CONNECTING' : 'OFFLINE';
 
   return (
@@ -261,9 +271,9 @@ const App: React.FC = () => {
           </div>
           <div className="border border-[#00ff41] p-2 bg-[#1a1a1a]">
             <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ TOP_GAINER</h2>
-            {marketData.length > 0 ? (
+            {moversData.length > 0 ? (
               (() => {
-                const gainer = [...marketData]
+                const gainer = [...moversData]
                   .filter(d => (d['Change %'] || 0) > 0)
                   .sort((a, b) => (b['Change %'] || 0) - (a['Change %'] || 0))[0];
                 
@@ -287,9 +297,9 @@ const App: React.FC = () => {
           </div>
           <div className="border border-[#00ff41] p-2 bg-[#1a1a1a]">
             <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ TOP_LOSER</h2>
-            {marketData.length > 0 ? (
+            {losersData.length > 0 ? (
               (() => {
-                const loser = [...marketData]
+                const loser = [...losersData]
                   .filter(d => (d['Change %'] || 0) < 0)
                   .sort((a, b) => (a['Change %'] || 0) - (b['Change %'] || 0))[0];
                 
@@ -347,7 +357,7 @@ const App: React.FC = () => {
               </button>
             </div>
             <CryptoTable 
-              data={marketData} 
+              data={currentMarketData} 
               interval={liveInterval}
               onIntervalChange={setLiveInterval}
               title={activeSort === 'desc' ? "MARKET_TOP_MOVERS (LIVE_WS)" : "MARKET_TOP_LOSERS (POLLING)"}
