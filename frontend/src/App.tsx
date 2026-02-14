@@ -107,6 +107,7 @@ const App: React.FC = () => {
 
   // Update live data when interval or sort changes
   useEffect(() => {
+    setMarketData([]); // Clear old data to prevent cross-tab flickering
     fetchLiveMovers();
   }, [liveInterval, activeSort]);
 
@@ -117,7 +118,7 @@ const App: React.FC = () => {
 
   // Dedicated poll for tracked assets to ensure freshness without relying on movers/losers feed
   useEffect(() => {
-    const poll = setInterval(fetchTrackedData, 10000);
+    const poll = setInterval(fetchTrackedData, 30000);
     return () => clearInterval(poll);
   }, [favorites, activeInterval]);
 
@@ -136,9 +137,8 @@ const App: React.FC = () => {
       ws.onmessage = (event) => {
         const message: WSMessage = JSON.parse(event.data);
         if (message.type === 'market_update' && message.data) {
-          // Note: WebSocket broadcast from backend is currently top-movers only
-          // We only update if the current sort is 'desc' to prevent overwrite of 'asc' data
-          if (activeSort === 'desc') {
+          // Sync check: Only update from WS if timeframe and sort match the broadcast source (1D, Desc)
+          if (activeSort === 'desc' && liveInterval === '1D') {
             setMarketData(message.data);
           }
         }
@@ -169,7 +169,7 @@ const App: React.FC = () => {
 
   // Auto-polling for both Movers and Losers to ensure perfect consistency
   useEffect(() => {
-    const poll = setInterval(fetchLiveMovers, 5000);
+    const poll = setInterval(fetchLiveMovers, 30000);
     return () => clearInterval(poll);
   }, [activeSort, liveInterval]);
 
@@ -263,7 +263,12 @@ const App: React.FC = () => {
             <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ TOP_GAINER</h2>
             {marketData.length > 0 ? (
               (() => {
-                const gainer = [...marketData].sort((a, b) => (b['Change %'] || 0) - (a['Change %'] || 0))[0];
+                const gainer = [...marketData]
+                  .filter(d => (d['Change %'] || 0) > 0)
+                  .sort((a, b) => (b['Change %'] || 0) - (a['Change %'] || 0))[0];
+                
+                if (!gainer) return <div className="text-sm font-bold opacity-30 italic">N/A (NO_GAINS)</div>;
+                
                 const price = gainer?.Price ?? 0;
                 const chg = gainer?.['Change %'] ?? 0;
                 return (
@@ -284,7 +289,12 @@ const App: React.FC = () => {
             <h2 className="text-[10px] font-bold border-b border-[#00ff41]/30 mb-2 opacity-70">/ TOP_LOSER</h2>
             {marketData.length > 0 ? (
               (() => {
-                const loser = [...marketData].sort((a, b) => (a['Change %'] || 0) - (b['Change %'] || 0))[0];
+                const loser = [...marketData]
+                  .filter(d => (d['Change %'] || 0) < 0)
+                  .sort((a, b) => (a['Change %'] || 0) - (b['Change %'] || 0))[0];
+                
+                if (!loser) return <div className="text-sm font-bold opacity-30 italic">N/A (NO_LOSSES)</div>;
+                
                 const price = loser?.Price ?? 0;
                 const chg = loser?.['Change %'] || 0;
                 return (
