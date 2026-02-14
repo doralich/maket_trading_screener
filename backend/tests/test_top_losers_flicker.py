@@ -90,16 +90,20 @@ def test_get_assets_by_symbols(screener_service):
 def test_get_top_movers_error_handling(screener_service):
     """
     Test error handling in get_top_movers to hit fallback lines.
+    Ensures context-aware fallback (negative for losers).
     """
     with patch('app.services.screener.CryptoScreener') as MockScreener:
         mock_instance = MockScreener.return_value
         mock_instance.get.side_effect = Exception("API Error")
         
-        results = screener_service.get_top_movers()
-        # Should return fallback data
-        assert len(results) == 1
-        assert results[0]['Symbol'] == "BINANCE:BTCUSDT"
-        assert results[0]['Price'] == 98000.0
+        # Test Movers (Gainers)
+        results = screener_service.get_top_movers(sort_descending=True)
+        assert results[0]['Change %'] > 0
+        
+        # Test Losers
+        results_losers = screener_service.get_top_movers(sort_descending=False)
+        assert results_losers[0]['Change %'] < 0
+        assert results_losers[0]['Symbol'] == "BINANCE:BTCUSDT"
 
 def test_get_assets_by_symbols_empty(screener_service):
     """

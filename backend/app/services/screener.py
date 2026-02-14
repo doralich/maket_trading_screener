@@ -103,7 +103,7 @@ class ScreenerService:
 
             cs.select(*request_fields)
             df = cs.get()
-            if df.empty: return self._get_fallback_data()
+            if df.empty: return self._get_fallback_data(sort_descending)
             
             processed_df = self._process_dataframe(df, f_map)
             
@@ -116,7 +116,7 @@ class ScreenerService:
             return processed_df.head(limit).replace({np.nan: None}).to_dict(orient='records')
         except Exception as e:
             print(f"DEBUG: Error in get_top_movers: {e}")
-            return self._get_fallback_data()
+            return self._get_fallback_data(sort_descending)
 
     def get_assets_by_symbols(self, symbols: list[str], interval: str = "1D"):
         if not symbols: return []
@@ -155,10 +155,12 @@ class ScreenerService:
             print(f"DEBUG: Search error: {e}")
         return []
 
-    def _get_fallback_data(self):
+    def _get_fallback_data(self, sort_descending: bool = True):
+        change = 2.5 if sort_descending else -2.5
+        rsi = 65.2 if sort_descending else 35.2
         return [
             {
-                "Symbol": "BINANCE:BTCUSDT", "Price": 98000.0, "Change %": 2.5, "Volume": 12000000000, 
-                "Exchange": "BINANCE", "Relative Strength Index (14)": 65.2
+                "Symbol": "BINANCE:BTCUSDT", "Price": 98000.0, "Change %": change, "Volume": 12000000000, 
+                "Exchange": "BINANCE", "Relative Strength Index (14)": rsi
             }
         ]
