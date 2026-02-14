@@ -50,6 +50,25 @@ class ScreenerService:
     def _process_dataframe(self, df, fields_map):
         if df.empty: return df
         
+        # Standardize the dataframe to prevent column name collisions.
+        # If the API returns default columns (like 'Change %' for 24h) that conflict 
+        # with our interval-specific renames, we drop the defaults first.
+        target_display_names = [
+            "Price", "Change %", "Volume", "Relative Strength Index (14)", 
+            "MACD Level (12, 26)", "MACD Signal (12, 26)",
+            "Simple Moving Average (20)", "Simple Moving Average (50)", "Simple Moving Average (200)"
+        ]
+        
+        source_cols = []
+        for f in fields_map.values():
+            if hasattr(f, "field_name"): source_cols.append(f.field_name)
+            if hasattr(f, "label"): source_cols.append(f.label)
+        
+        # Drop existing columns that share a target name but are NOT the intended source
+        cols_to_drop = [c for c in df.columns if c in target_display_names and c not in source_cols]
+        if cols_to_drop:
+            df = df.drop(columns=cols_to_drop)
+
         rename_map = {"name": "Symbol", "exchange": "Exchange", "description": "Description"}
         
         calc_map = {

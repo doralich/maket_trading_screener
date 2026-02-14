@@ -77,7 +77,14 @@ const App: React.FC = () => {
       
       const updatedData = data.map((item: any) => {
         const wsUpdate = marketData.find(d => d.Symbol === item.Symbol);
-        if (wsUpdate && (activeInterval === '1' || activeInterval === '5' || activeInterval === '1D')) {
+        // CRITICAL FIX: Only merge if the intervals match.
+        // liveInterval is for REST poll, while WebSocket pushes (top-movers) are always 1D.
+        // We only merge if the activeInterval matches the source of marketData.
+        
+        const isRestMatch = activeInterval === liveInterval;
+        const isWsMatch = activeInterval === '1D' && activeSort === 'desc';
+        
+        if (wsUpdate && (isRestMatch || isWsMatch)) {
           return {
             ...item,
             Price: wsUpdate.Price ?? item.Price,
@@ -107,6 +114,12 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchTrackedData();
   }, [favorites, activeInterval, marketData]);
+
+  // Dedicated poll for tracked assets to ensure freshness without relying on movers/losers feed
+  useEffect(() => {
+    const poll = setInterval(fetchTrackedData, 10000);
+    return () => clearInterval(poll);
+  }, [favorites, activeInterval]);
 
   useEffect(() => {
     const connect = () => {
