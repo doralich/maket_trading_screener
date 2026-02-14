@@ -85,9 +85,11 @@ class ScreenerService:
 
         for f, display_name in calc_map.items():
             if not f: continue
-            target_name = f.field_name if hasattr(f, "field_name") else str(f)
-            target_label = f.label if hasattr(f, "label") else str(f)
-            actual_col = next((col for col in df.columns if col == target_name or col == target_label), None)
+            target_name = f.field_name.lower() if hasattr(f, "field_name") else str(f).lower()
+            target_label = f.label.lower() if hasattr(f, "label") else str(f).lower()
+            
+            # FIX: Case-insensitive match to handle API returning 'Change|5' vs library 'change|5'
+            actual_col = next((col for col in df.columns if col.lower() == target_name or col.lower() == target_label), None)
             if actual_col: rename_map[actual_col] = display_name
         
         df = df.rename(columns=rename_map)

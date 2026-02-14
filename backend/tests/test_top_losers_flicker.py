@@ -110,3 +110,24 @@ def test_get_assets_by_symbols_empty(screener_service):
     Test empty input for get_assets_by_symbols.
     """
     assert screener_service.get_assets_by_symbols([]) == []
+
+def test_case_insensitive_renaming(screener_service):
+    """
+    Test that 'Change|5' (capital C) is correctly renamed to 'Change %'.
+    """
+    with patch('app.services.screener.CryptoScreener') as MockScreener:
+        mock_instance = MockScreener.return_value
+        # Mock data with capital 'Change|5' as returned by the API
+        mock_instance.get.return_value = pd.DataFrame({
+            'Symbol': ['TEST1'],
+            'Price': [100.0],
+            'Change|5': [-2.5],
+            'Volume': [100000]
+        })
+        
+        # Request with interval '5'
+        results = screener_service.get_top_movers(interval='5')
+        assert len(results) == 1
+        assert 'Change %' in results[0]
+        assert results[0]['Change %'] == -2.5
+        assert 'Change|5' not in results[0]
