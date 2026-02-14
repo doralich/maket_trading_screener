@@ -121,21 +121,21 @@ const App: React.FC = () => {
   // Polling for Movers
   useEffect(() => {
     fetchLiveMovers();
-    const poll = setInterval(fetchLiveMovers, 30000);
+    const poll = setInterval(fetchLiveMovers, 10000);
     return () => clearInterval(poll);
   }, [liveInterval]);
 
   // Polling for Losers
   useEffect(() => {
     fetchLiveLosers();
-    const poll = setInterval(fetchLiveLosers, 30000);
+    const poll = setInterval(fetchLiveLosers, 10000);
     return () => clearInterval(poll);
   }, [liveInterval]);
 
   // Polling for Tracked
   useEffect(() => {
     fetchTrackedData();
-    const poll = setInterval(fetchTrackedData, 30000);
+    const poll = setInterval(fetchTrackedData, 10000);
     return () => clearInterval(poll);
   }, [favorites, activeInterval, liveInterval, moversData, losersData]);
 
