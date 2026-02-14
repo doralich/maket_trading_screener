@@ -35,5 +35,7 @@ I want to build a local browser based app based on the link: https://github.com/
 
 ### Technical Implementation Details
 - **True Market Sorting:** To identify genuine losers, sorting is performed server-side (TradingView API) rather than locally. This ensures the results are drawn from the full market universe rather than just the currently loaded subset.
+- **Redundant Filter Enforcement:** Implements dual-layer filtering (API-level query + local safety checks) to ensure Top Losers lists strictly contain negative changes, eliminating UI "flickering" during market volatility.
+- **Case-Insensitive Data Mapping:** Backend processing uses case-insensitive matching for API result columns (e.g., 'Change|5' vs 'change|5') to ensure high-precision interval metrics are correctly identified and displayed.
 - **Liquidity Protection:** A global 50,000 USD (24h) volume floor is applied to all "Top" queries to filter out illiquid pairs and price glitches, ensuring only active, tradable assets are displayed.
 - **Interval Mapping:** Uses precise `change|X` API fields for rolling intraday performance tracking (1m, 5m, 15m, 1h, 4h) to maintain consistency with standard technical analysis candles.
