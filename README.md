@@ -52,38 +52,38 @@ flowchart TD
     end
 
     %% --- DATA FLOW 1: DISCOVERY (Indexing) ---
-    TV_API -.->|1. Fetch Catalog| S_Idx
-    S_Idx ==>|2. Sync Tickers| DB
-    S_Idx ==>|3. Prune Tracked| DB
+    TV_API -.->|"1. Fetch Catalog"| S_Idx
+    S_Idx ==>|"2. Sync Tickers"| DB
+    S_Idx ==>|"3. Prune Tracked"| DB
 
     %% --- DATA FLOW 2: LIVE MARKET (Streaming) ---
-    W_Broad -->|Trigger| S_Screen
-    S_Screen -.->|4. Fetch Snapshots| TV_API
-    S_Screen -->|5. Format JSON| Main
-    Main -->|6a. WebSocket Push (1D)| S_Movers
-    Main -->|6b. REST Polling| S_Losers
+    W_Broad -->|"Trigger"| S_Screen
+    S_Screen -.->|"4. Fetch Snapshots"| TV_API
+    S_Screen -->|"5. Format JSON"| Main
+    Main -->|"6a. WebSocket Push (1D)"| S_Movers
+    Main -->|"6b. REST Polling"| S_Losers
 
     %% --- DATA FLOW 3: HISTORY (Collection) ---
-    W_Coll -->|Trigger| S_Coll
-    DB ==>|7. Read Favorites| S_Coll
-    S_Coll -.->|8. Snapshot Fetch| TV_API
-    S_Coll ==>|9. Append History| DB
+    W_Coll -->|"Trigger"| S_Coll
+    DB ==>|"7. Read Favorites"| S_Coll
+    S_Coll -.->|"8. Snapshot Fetch"| TV_API
+    S_Coll ==>|"9. Append History"| DB
 
     %% --- DATA FLOW 4: INTERACTION ---
-    Search -->|10. Search Query| Main
-    Main -->|11. SQL LIKE| S_Screen
-    S_Screen ==>|12. Ticker Lookup| DB
+    Search -->|"10. Search Query"| Main
+    Main -->|"11. SQL LIKE"| S_Screen
+    S_Screen ==>|"12. Ticker Lookup"| DB
     
-    MainApp -->|13. Toggle Track| S_Fav
-    S_Fav ==>|14. CRUD Ops| DB
+    S_Movers -->|"13. Toggle Track"| S_Fav
+    S_Fav ==>|"14. CRUD Ops"| DB
 
-    MainApp -->|15. Fetch History| S_Hist
-    S_Hist ==>|16. Read Data| DB
+    S_Favs -->|"15. Fetch History"| S_Hist
+    S_Hist ==>|"16. Read Data"| DB
 
     %% --- UI CONNECTIONS ---
-    MainApp --- Search
-    MainApp --- Table
-    MainApp --- Console
+    S_Movers --- Search
+    S_Movers --- Table
+    S_Movers --- Console
 
     %% --- STYLING ---
     style TV_API fill:#f9f,stroke:#333,stroke-width:2px
