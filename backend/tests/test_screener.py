@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from app.services.screener import ScreenerService
 import pandas as pd
+from app.models import TickerIndex
 
 @pytest.fixture
 def screener_service():
@@ -26,15 +27,19 @@ def test_get_top_movers_structure(screener_service):
         assert 'Price' in result[0]
 
 def test_search_ticker(screener_service):
-    with patch('app.services.screener.CryptoScreener') as MockScreener:
-        mock_instance = MockScreener.return_value
-        mock_instance.get.return_value = pd.DataFrame({
-            'Symbol': ['BTCUSD'],
-            'Price': [50000.0]
-        })
+    # Patching Session used in search_ticker
+    with patch('app.services.screener.Session') as MockSession:
+        mock_session = MockSession.return_value
+        mock_session.__enter__.return_value = mock_session
+        
+        # Mock results
+        mock_results = [
+            TickerIndex(symbol='BTCUSD', exchange='BINANCE', name='BTC', description='Bitcoin')
+        ]
+        mock_session.exec.return_value.all.return_value = mock_results
         
         result = screener_service.search_ticker('BTC')
         
         assert isinstance(result, list)
         assert len(result) == 1
-        assert result[0]['Symbol'] == 'BTCUSD'
+        assert result[0]['symbol'] == 'BTCUSD'

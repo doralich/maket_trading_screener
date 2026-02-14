@@ -87,6 +87,10 @@ class ScreenerService:
             cs.set_range(0, limit)
             f_map = self._get_common_fields(interval)
             
+            # FIX: Enforce strictly negative change for losers to prevent positive values (flickering bug)
+            if not sort_descending:
+                cs.where(f_map["change"] < 0)
+            
             # 3. API-Side Sorting: Essential for true top/bottom detection
             cs.sort_by(f_map["change"], ascending=not sort_descending)
             
@@ -102,6 +106,11 @@ class ScreenerService:
             if df.empty: return self._get_fallback_data()
             
             processed_df = self._process_dataframe(df, f_map)
+            
+            # Local Safety Filter: Double-check to prevent positive values in Top Losers
+            if not sort_descending:
+                processed_df = processed_df[processed_df['Change %'] < 0]
+
             # Final sort consistency
             processed_df = processed_df.sort_values(by='Change %', ascending=not sort_descending)
             return processed_df.head(limit).replace({np.nan: None}).to_dict(orient='records')

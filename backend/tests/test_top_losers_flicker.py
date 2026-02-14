@@ -70,3 +70,39 @@ def test_top_losers_stability_updates(screener_service):
         results2 = screener_service.get_top_movers(limit=5, sort_descending=False)
         neg_only_2 = [r['Change %'] for r in results2]
         assert all(c < 0 for c in neg_only_2), f"Update 2 failed: {neg_only_2}"
+
+def test_get_assets_by_symbols(screener_service):
+    """
+    Test get_assets_by_symbols to boost coverage.
+    """
+    with patch('app.services.screener.CryptoScreener') as MockScreener:
+        mock_instance = MockScreener.return_value
+        mock_instance.get.return_value = pd.DataFrame({
+            'Symbol': ['BINANCE:BTCUSDT'],
+            'Price': [95000.0],
+            'Change %': [1.5]
+        })
+        
+        results = screener_service.get_assets_by_symbols(['BINANCE:BTCUSDT'])
+        assert len(results) == 1
+        assert results[0]['Symbol'] == 'BINANCE:BTCUSDT'
+
+def test_get_top_movers_error_handling(screener_service):
+    """
+    Test error handling in get_top_movers to hit fallback lines.
+    """
+    with patch('app.services.screener.CryptoScreener') as MockScreener:
+        mock_instance = MockScreener.return_value
+        mock_instance.get.side_effect = Exception("API Error")
+        
+        results = screener_service.get_top_movers()
+        # Should return fallback data
+        assert len(results) == 1
+        assert results[0]['Symbol'] == "BINANCE:BTCUSDT"
+        assert results[0]['Price'] == 98000.0
+
+def test_get_assets_by_symbols_empty(screener_service):
+    """
+    Test empty input for get_assets_by_symbols.
+    """
+    assert screener_service.get_assets_by_symbols([]) == []

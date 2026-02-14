@@ -14,6 +14,7 @@ def test_sync_tickers(session, monkeypatch):
     # Mock the tvscreener call to avoid network dependency in tests
     class MockScreener:
         def set_range(self, start, end): pass
+        def where(self, condition): pass
         def get(self):
             import pandas as pd
             return pd.DataFrame([
